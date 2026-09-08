@@ -96,3 +96,43 @@ export $(cat .env | xargs)
 python src/run_pipeline.py --mode weekly
 python src/build_dashboard.py
 ```
+
+## Источники
+
+Тиры определяют частоту проверки. RSS-источники со статусом «есть»
+уже можно прописать в `config/parameters.yaml -> sources` — пайплайн
+подхватит их автоматически. Источники без RSS собираются вручную и
+вносятся в `data/backlog.csv` по той же схеме колонок (см. раздел
+«Источники без RSS» выше).
+
+### Tier 1 — еженедельно
+
+| Источник | Фокус | RSS для авто-сбора |
+|---|---|---|
+| HR Tech Feed | HR-tech новости и аналитика | ✅ `https://hrtechfeed.com/feed/` |
+| Crunchbase News | раунды финансирования, M&A | ✅ `https://news.crunchbase.com/feed/` |
+| Recruiting Brainfood (Hung Lee) | рекрутмент/HR-tech от практика | ✅ `https://www.recruitingbrainfood.com/feed` (лента обновляется нечасто — проверяйте свежесть) |
+| Telegram-каналы про HR-tech/рекрутмент/продукт (RU) | локальный контекст, конкуренты в РФ/СНГ | ❌ нет прямого RSS — 6–10 каналов по критериям (оригинальный контент, 2–3+ поста/нед, фокус на HR-tech/gig), подключать через rss.app или проверять вручную |
+| Прямые конкуренты: LinkedIn Talent Solutions, Indeed, ZipRecruiter, Deel, Instawork, Wonolo, Jobandtalent | продуктовые анонсы, PR | ❌ в основном без открытого RSS — проверять вручную, для блогов отдельно тестировать `/feed` |
+
+### Tier 2 — раз в 2 недели
+
+| Источник | Фокус | RSS для авто-сбора |
+|---|---|---|
+| TechCrunch | стартапы, фандинг, future of work | ✅ `https://techcrunch.com/feed/` |
+| Sifted | европейские стартапы, включая HR-tech/gig | ✅ `https://sifted.eu/feed` |
+| Rest of World | технологии на развивающихся рынках | ✅ `https://restofworld.org/feed/` |
+| Y Combinator Blog | новости самого YC (не портфолио) | ✅ `https://www.ycombinator.com/blog/rss` |
+| Директория YC — Recruiting/Talent | портфолио стартапов по найму | ❌ нет RSS — `ycombinator.com/companies/industry/recruiting`, смотреть вручную |
+| AIM Group, Staffing Industry Analysts (SIA), TAtech | отраслевая аналитика staffing/HR-tech | ❌ часто по подписке, RSS не подтверждён — проверять вручную/через email-дайджест |
+
+### Tier 3 — ежемесячно или по календарю событий
+
+| Источник | Фокус | RSS для авто-сбора |
+|---|---|---|
+| WEF Future of Jobs Report | глобальные тренды рынка труда | ❌ проверять страницу отчёта вручную |
+| OECD Future of Work | исследования рынка труда | ❌ проверять вручную |
+| McKinsey Global Institute | future of work исследования | ❌ проверять вручную / email-дайджест |
+| a16z Future of Work (блог) | венчурный взгляд на HR/gig-tech | ❌ RSS не проверен в этом заходе |
+| Sensor Tower / data.ai (блог) | тренды загрузок gig-приложений | ❌ проверять вручную |
+| HR Tech Conference, Unleash, TAtech, SIA Executive Forum | конференции | — событийный источник, не RSS; фиксировать даты в календаре |
