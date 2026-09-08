@@ -1,0 +1,54 @@
+name: Weekly Signal Scan
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "weekly или backfill"
+        required: false
+        default: "weekly"
+      start:
+        description: "Дата начала для backfill, формат ГГГГ-ММ-ДД (необязательно)"
+        required: false
+        default: ""
+      end:
+        description: "Дата конца для backfill, формат ГГГГ-ММ-ДД (необязательно)"
+        required: false
+        default: ""
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline (fetch + analyze)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python src/run_pipeline.py \
+            --mode "${{ github.event.inputs.mode || 'weekly' }}" \
+            --start "${{ github.event.inputs.start || '' }}" \
+            --end "${{ github.event.inputs.end || '' }}"
+
+      - name: Build dashboard
+        run: python src/build_dashboard.py
+
+      - name: Commit updated backlog and dashboard
+        run: |
+          git config user.name "avito-signal-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/backlog.csv docs/index.html
+          git diff --cached --quiet || git commit -m "Еженедельное обновление бэклога сигналов [skip ci]"
+          git push
