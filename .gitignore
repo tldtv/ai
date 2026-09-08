@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+.env
+data/_new_raw_signals.json
