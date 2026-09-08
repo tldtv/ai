@@ -69,7 +69,23 @@ sources:
     tier: 2
     type: rss
     url: "https://techcrunch.com/feed/"
-  - name: "ДОБАВЬТЕ СВОЙ ИСТОЧНИК"
+   - name: "Crunchbase News"
     tier: 1
     type: rss
-    url: ""
+    url: "https://news.crunchbase.com/feed/"
+  - name: "Recruiting Brainfood"
+    tier: 1
+    type: rss
+    url: "https://www.recruitingbrainfood.com/feed"
+  - name: "Sifted"
+    tier: 2
+    type: rss
+    url: "https://sifted.eu/feed"
+  - name: "Rest of World"
+    tier: 2
+    type: rss
+    url: "https://restofworld.org/feed/"
+  - name: "Y Combinator Blog"
+    tier: 2
+    type: rss
+    url: "https://www.ycombinator.com/blog/rss"
