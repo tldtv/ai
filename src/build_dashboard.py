@@ -39,6 +39,18 @@ CRITERIA_LABELS = {
     "regulatory_risk": "Регуляторный риск",
 }
 
+# Короткие пояснения к каждому критерию — показываются тултипом при наведении
+# на его название в разбивке оценки на карточке.
+CRITERIA_DESCRIPTIONS = {
+    "strategic_fit": "Насколько идея соответствует стратегии и одному из трёх рынков Авито.Работы (Классифайд, Подработка, HR-tech)",
+    "signal_strength": "Насколько сигнал подтверждён — несколько независимых источников сильнее, чем одно упоминание",
+    "market_growth": "Насколько велик и быстро растёт рынок или тренд, к которому относится сигнал",
+    "asset_fit": "Насколько легко реализовать идею на существующих активах Авито — аудитории, платформе, интеграциях",
+    "feasibility": "Насколько реалистично собрать MVP в разумный срок доступными ресурсами",
+    "urgency": "Насколько узко окно возможности — конкуренты или тренд не будут ждать",
+    "regulatory_risk": "Насколько низки регуляторные и юридические риски запуска — чем выше оценка, тем меньше риск",
+}
+
 TEMPLATE = """<!doctype html>
 <html lang="ru">
 <head>
@@ -117,9 +129,28 @@ TEMPLATE = """<!doctype html>
   .breakdown summary::before{{content:"▸ ";}}
   .breakdown[open] summary::before{{content:"▾ ";}}
   .breakdown ul{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}}
-  .breakdown li{{display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
+  .breakdown li{{position:relative;display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
   .breakdown li:first-child{{border-top:none;}}
   .breakdown .val{{font-weight:700;color:var(--ink);}}
+  .crit-name{{cursor:help;border-bottom:1px dotted var(--ink-soft);}}
+  .crit-name:hover::after, .crit-name:focus::after{{
+    content:attr(data-tip);
+    position:absolute;
+    left:0;
+    bottom:100%;
+    margin-bottom:6px;
+    background:var(--ink);
+    color:#fff;
+    padding:7px 10px;
+    border-radius:7px;
+    font-size:11px;
+    line-height:1.45;
+    width:220px;
+    max-width:70vw;
+    white-space:normal;
+    z-index:6;
+    box-shadow:0 6px 16px rgba(0,0,0,.18);
+  }}
 
   .assistant-toggle{{position:fixed;right:20px;bottom:20px;z-index:20;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:12px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;}}
   .assistant-panel{{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .22s ease;z-index:30;display:flex;flex-direction:column;}}
@@ -445,7 +476,9 @@ def render_breakdown(row):
     if not scores:
         return ""
     items = "".join(
-        f'<li><span>{html.escape(CRITERIA_LABELS.get(k, k))}</span><span class="val">{html.escape(str(v))}/5</span></li>'
+        f'<li><span class="crit-name" tabindex="0" data-tip="{html.escape(CRITERIA_DESCRIPTIONS.get(k, ""))}">'
+        f'{html.escape(CRITERIA_LABELS.get(k, k))}</span>'
+        f'<span class="val">{html.escape(str(v))}/5</span></li>'
         for k, v in scores.items()
     )
     return f'<details class="breakdown"><summary>Разбивка оценки</summary><ul>{items}</ul></details>'
