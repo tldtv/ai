@@ -2,804 +2,1742 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Точки роста — Авито.Работа</title>
 <style>
-  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#F7F5F0;color:#23262B;margin:0;padding:32px 24px;}
+  :root {
+    --accent: #7C3AED;
+    --accent-soft: #7C3AED1a;
+    --bg: #F7F5F0;
+    --surface: #fff;
+    --ink: #23262B;
+    --ink-soft: #767b82;
+    --border: #e3ddd2;
+    --green: #2f9e59;    --green-soft: #e4f5ea; --green-ink: #1f6b3d;
+    --yellow: #c98a1f;   --yellow-soft: #fbeed7; --yellow-ink: #8a5a12;
+    --red: #c0392b;      --red-soft: #fbe1de;    --red-ink: #96291b;
+    --grey: #a3a3a3;     --grey-soft: #eee;      --grey-ink: #777;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}
   h1{font-size:22px;margin:0 0 4px;}
-  .sub{color:#777;font-size:13px;margin:0 0 20px;}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;}
-  .tab{font:inherit;padding:6px 14px;border-radius:999px;border:1px solid #ddd;background:#fff;cursor:pointer;}
-  .tab.active{background:#2C6E6B;color:#fff;border-color:#2C6E6B;}
-  .market-panel{display:none;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
-  .market-panel.active{display:grid;}
-  .card{background:#fff;border:1px solid #e3ddd2;border-left:5px solid #ccc;border-radius:10px;padding:14px;}
-  .card.green{border-left-color:#2f9e59;}
-  .card.yellow{border-left-color:#c98a1f;}
-  .card.red{border-left-color:#c0392b;}
-  .card.grey{border-left-color:#aaa;}
-  .card-top{display:flex;justify-content:space-between;align-items:center;}
-  .card h3{font-size:15px;margin:8px 0 6px;}
-  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#eee;}
-  .pill.green{background:#e4f5ea;color:#1f6b3d;}
-  .pill.yellow{background:#fbeed7;color:#8a5a12;}
-  .pill.red{background:#fbe1de;color:#96291b;}
-  .pill.grey{background:#eee;color:#777;}
-  .status{font-size:11px;color:#888;}
-  .hyp{font-size:13px;color:#444;}
-  .meta{font-size:11.5px;color:#888;}
-  .empty{color:#999;font-size:13px;}
+  .sub{color:var(--ink-soft);font-size:13px;margin:0 0 22px;}
+
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;}
+  .stat{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;border-left:4px solid var(--grey);}
+  .stat .n{display:block;font-size:22px;font-weight:700;line-height:1.1;}
+  .stat .l{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .stat.total{border-left-color:var(--accent);}
+  .stat.green{border-left-color:var(--green);}
+  .stat.yellow{border-left-color:var(--yellow);}
+  .stat.red{border-left-color:var(--red);}
+  .stat.active{outline:2px solid var(--accent);outline-offset:-1px;}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+  .tabs, .sort{display:flex;gap:8px;flex-wrap:wrap;}
+  .tab, .sortbtn{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}
+  .tab.active, .sortbtn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .sort{font-size:12px;color:var(--ink-soft);align-items:center;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--grey);border-radius:10px;padding:14px;}
+  .card.green{border-left-color:var(--green);}
+  .card.yellow{border-left-color:var(--yellow);}
+  .card.red{border-left-color:var(--red);}
+  .card.hidden{display:none;}
+  .card-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .badges{display:flex;gap:6px;flex-wrap:wrap;}
+  .card h3{font-size:15px;margin:8px 0 6px;text-wrap:balance;}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--grey-soft);color:var(--grey-ink);white-space:nowrap;}
+  .pill.green{background:var(--green-soft);color:var(--green-ink);}
+  .pill.yellow{background:var(--yellow-soft);color:var(--yellow-ink);}
+  .pill.red{background:var(--red-soft);color:var(--red-ink);}
+  .pill.market{background:var(--accent-soft);color:var(--accent);}
+  .pill.status{background:var(--grey-soft);color:var(--grey-ink);}
+  .hyp{font-size:13px;color:#444;margin:0 0 8px;}
+  .meta{font-size:11.5px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;}
+  .meta a{color:var(--accent);}
+  .flag{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}
+  .empty{color:#999;font-size:13px;grid-column:1/-1;}
 </style>
 </head>
 <body>
   <h1>Точки роста — Авито.Работа</h1>
-  <p class="sub">Бэклог сигналов, авто-обновление по расписанию · пороги светофора из config/parameters.yaml</p>
-  <div class="tabs"><button class="tab" data-market="Все">Все</button><button class="tab" data-market="HR-tech">HR-tech</button><button class="tab" data-market="Классифайд">Классифайд</button><button class="tab" data-market="Не определено">Не определено</button><button class="tab" data-market="Подработка">Подработка</button></div>
-  <section class="market-panel" data-market="Все">
-    <article class="card yellow">
+  <p class="sub">Бэклог сигналов · авто-обновление по расписанию · пороги и цвет — из config/parameters.yaml</p>
+
+  <div class="stats" id="stats">
+    <button class="stat total active" data-color="Все">
+      <span class="n">106</span><span class="l">Всего идей</span>
+    </button>
+    <button class="stat green" data-color="green">
+      <span class="n">4</span><span class="l">🟢 Зелёных</span>
+    </button>
+    <button class="stat yellow" data-color="yellow">
+      <span class="n">45</span><span class="l">🟡 Жёлтых</span>
+    </button>
+    <button class="stat red" data-color="red">
+      <span class="n">57</span><span class="l">🔴 Красных</span>
+    </button>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs" id="tabs"><button class="tab active" data-market="Все">Все</button><button class="tab" data-market="HR-tech">HR-tech</button><button class="tab" data-market="Классифайд">Классифайд</button><button class="tab" data-market="Не определено">Не определено</button><button class="tab" data-market="Подработка">Подработка</button></div>
+    <div class="sort" id="sort">
+      Сортировка:
+      <button class="sortbtn active" data-sort="score">по оценке</button>
+      <button class="sortbtn" data-sort="date">по дате</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3.6" data-date="2025-09-29">
       <div class="card-top">
         <span class="pill yellow">3.6</span>
-        <span class="status">review</span>
+        <span class="pill status">review</span>
       </div>
       <h3>Alex lands $20M to automate AI recruiting workflows</h3>
+      <div class="badges"><span class="pill market">HR-tech</span><span class="pill">кластер C-AIR-01</span></div>
       <p class="hyp">Расширить AIR от точечного AI-скрининга к end-to-end автоматизации воронки (интервью + fraud-детекция + ATS-интеграция) как апсейл-модуль для HR-tech клиентов Авито.Работы.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/ai-powered-recruiting-startup-lands-20-million/" target="_blank" rel="noopener">ссылка</a> · 2025-09-29 · уверенность: Низкая-средняя — единственный сигнал, дата вне целевого окна (июнь–август 2026), нужен повторный поиск на аналогичные раунды именно в этот период.</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/ai-powered-recruiting-startup-lands-20-million/" target="_blank" rel="noopener">источник</a>
+        · 2025-09-29
+        · уверенность: Низкая-средняя — единственный сигнал, дата вне целевого окна (июнь–август 2026), нужен повторный поиск на аналогичные раунды именно в этот период.
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card green">
+    <article class="card green" data-market="Подработка" data-color="green" data-score="4.0" data-date="2026-07-14">
       <div class="card-top">
         <span class="pill green">4.0</span>
-        <span class="status">shortlisted</span>
+        <span class="pill status">shortlisted</span>
       </div>
       <h3>Branch: Expanding Earned Wage Access - the new Flex model</h3>
+      <div class="badges"><span class="pill market">Подработка</span><span class="pill">кластер C-EWA-01</span></div>
       <p class="hyp">Добавить мгновенный вывод заработанного (earned wage access) как встроенную функцию в Авито.Подработку через партнёрство с платёжным провайдером вместо самостоятельной разработки инфраструктуры.</p>
-      <p class="meta">Источник: <a href="https://branchapp.com/blog/flex-embedded-ewa" target="_blank" rel="noopener">ссылка</a> · 2026-07-14 · уверенность: Средняя-высокая — сигнал внутри целевого окна, тема подтверждается несколькими независимыми EWA-платформами по данным поиска, не только Branch.</p>
+      <p class="meta">
+        <a href="https://branchapp.com/blog/flex-embedded-ewa" target="_blank" rel="noopener">источник</a>
+        · 2026-07-14
+        · уверенность: Средняя-высокая — сигнал внутри целевого окна, тема подтверждается несколькими независимыми EWA-платформами по данным поиска, не только Branch.
+        
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>HR Tech Exec Announcements</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для продуктов HRmost и AIR: разработать и продвигать сертифицированные функции безопасности данных и комплаенса как конкурентное преимущество при работе с крупными корпоративными клиентами, озабоченными защитой персональных данных сотрудников.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/hr-tech-exec-announcements-4/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=hr-tech-exec-announcements-4" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/hr-tech-exec-announcements-4/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=hr-tech-exec-announcements-4" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>SIA Report: The Digital Workforce in Recruitment 2026</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech: Разработать в AIR/HRmost функционал управления гибридными командами (человек + AI-агент), позволяющий работодателям распределять задачи между людьми и цифровыми агентами, отслеживать их взаимодействие и оптимизировать затраты на персонал с учётом новой реальности &#x27;цифровой рабочей силы&#x27;.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/sia-report-the-digital-workforce-in-recruitment-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=sia-report-the-digital-workforce-in-recruitment-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/sia-report-the-digital-workforce-in-recruitment-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=sia-report-the-digital-workforce-in-recruitment-2026" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card green">
+    <article class="card green" data-market="HR-tech" data-color="green" data-score="4" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill green">4</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>ADP Partners with AWS to Accelerate AI-Powered Innovation in Human Capital Management</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech: интегрировать AI-возможности (на базе Yandex Cloud или собственных LLM) в HRmost и AIR для автоматизации скрининга резюме, генерации job description, чат-ботов для кандидатов и предиктивной аналитики текучести — позиционируясь как &#x27;AI-native&#x27; альтернатива для российского рынка, где западные решения ушли.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Классифайд" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>This Profitable Job Board Charges Seekers</h3>
+      <div class="badges"><span class="pill market">Классифайд</span></div>
       <p class="hyp">Для рынка Классифайд/джобборды: протестировать премиум-подписку для соискателей в дефицитных или высокооплачиваемых категориях (IT, топ-менеджмент, редкие специальности), дающую приоритетное размещение резюме, эксклюзивный доступ к закрытым вакансиям и персональную поддержку. Валидировать willingness to pay через A/B-тест на 2-3 вертикалях с конверсией в paid pilot.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/this-profitable-job-board-charges-seekers/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=this-profitable-job-board-charges-seekers" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/this-profitable-job-board-charges-seekers/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=this-profitable-job-board-charges-seekers" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Подработка" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Fintech is helping shift global payroll away from traditional processing</h3>
+      <div class="badges"><span class="pill market">Подработка</span></div>
       <p class="hyp">HR-tech: интеграция финтех-возможностей в HRmost/AIR — досрочный доступ к зарплате для работников через партнёрство с финтех-провайдерами, что усилит ценностное предложение для работодателей и повысит удержание пользователей платформы.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/fintech-is-helping-shift-global-payroll-away-from-traditional-processing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=fintech-is-helping-shift-global-payroll-away-from-traditional-processing" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/fintech-is-helping-shift-global-payroll-away-from-traditional-processing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=fintech-is-helping-shift-global-payroll-away-from-traditional-processing" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>3 out of 4 gen AI users fear for their job security</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать продукт или модуль для работодателей, помогающий управлять коммуникацией вокруг внедрения AI — прозрачные планы трансформации ролей, программы переобучения, мэтчинг сотрудников на новые позиции внутри компании. Это снизит тревожность, повысит retention и позиционирует Авито.Работу как ответственного партнёра в AI-трансформации.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/3-out-of-4-gen-ai-users-fear-for-their-job-security/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=3-out-of-4-gen-ai-users-fear-for-their-job-security" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/3-out-of-4-gen-ai-users-fear-for-their-job-security/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=3-out-of-4-gen-ai-users-fear-for-their-job-security" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Performance Management and Integration center: How to export ratings in every step via IC</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech: Разработать в HRmost модуль экспорта детализированных данных по оценке эффективности сотрудников с возможностью кастомизации выгрузок по этапам и метрикам, что повысит привлекательность продукта для средних и крупных компаний, нуждающихся в интеграции с BI-системами и продвинутой аналитике.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>What’s New in Rollie – September 8, 2026</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для HR-tech продуктов (HRmost/AIR): провести аудит собственной data-архитектуры и оценить готовность к масштабированию аналитических возможностей. Возможность создать конкурентное преимущество через упреждающее развитие data-инфраструктуры для AI-функций и предиктивной аналитики по HR-метрикам до того, как конкуренты выйдут с новыми продуктами.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/whats-new-in-rollie-september-8-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=whats-new-in-rollie-september-8-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/whats-new-in-rollie-september-8-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=whats-new-in-rollie-september-8-2026" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Recruiting and hiring: Where AI delegation meets exposure and exclusion</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): разработать и вывести на рынок AI-инструменты для рекрутинга с встроенным compliance-модулем, обеспечивающим прозрачность решений, аудит на предмет дискриминации и соответствие трудовому законодательству РФ. Позиционировать как &#x27;безопасный ИИ для найма&#x27;, снижающий юридические риски работодателя.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>‘You cannot sue an AI’: Why adoption comes down to people, not platforms</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для продуктов HRmost и AIR: разработать модуль онбординга и обучения работодателей/HR-специалистов работе с AI-функциями платформы, включающий guided tours, контекстные подсказки и систему сертификации пользователей, что повысит retention и глубину использования платных AI-функций.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Automate Business Processes and Ensure Data Quality with Workflows in Employee Central</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Добавить в HRmost или AIR конструктор настраиваемых workflows для автоматизации типовых HR-процессов (согласование отпусков, онбординг, изменение данных), что повысит привлекательность продуктов для средних и крупных компаний, ищущих альтернативу дорогим западным системам.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Built for Change: Tracey Friend’s Career Crossroads</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): разработать образовательный контент или community-функционал для TA-специалистов о трансформации роли рекрутера в эпоху AI, позиционируя продукты как enabler карьерного роста, а не угрозу замещения.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/built-for-change-tracey-friends-career-crossroads/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=built-for-change-tracey-friends-career-crossroads" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/built-for-change-tracey-friends-career-crossroads/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=built-for-change-tracey-friends-career-crossroads" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Подработка" data-color="yellow" data-score="3" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Gen X and millennials feel least positive after work, new research finds</h3>
+      <div class="badges"><span class="pill market">Подработка</span></div>
       <p class="hyp">Авито.Подработка: разработать функционал wellbeing-поддержки для сменных работников 30-55 лет — рекомендации по балансу смен, геймификация достижений, накопительные бонусы за стабильность, интеграция с программами финансового благополучия и обучения, что повысит удержание и частоту возвращения на платформу.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/gen-x-and-millennials-feel-least-positive-after-work-new-research-finds/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=gen-x-and-millennials-feel-least-positive-after-work-new-research-finds" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/gen-x-and-millennials-feel-least-positive-after-work-new-research-finds/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=gen-x-and-millennials-feel-least-positive-after-work-new-research-finds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Guardian Jobs is Closing.</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для рынка Классифайд/джоборды: усилить позиционирование Авито.Работы как универсального агрегатора с акцентом на локальность и широту охвата вакансий, которую не могут обеспечить узкоспециализированные или медийные джоборды. Возможность привлечь работодателей и аудиторию, оставшихся без привычного канала в аналогичных случаях локальных закрытий.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/guardian-jobs-is-closing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=guardian-jobs-is-closing" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/guardian-jobs-is-closing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=guardian-jobs-is-closing" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Consolidated Time Recording (CTR) in New SAP S/4HANA Public Cloud Timesheet App for Prof Services</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): разработать lightweight модуль учёта рабочего времени с акцентом на compliance для российского рынка, интегрированный с существующими продуктами HRmost, ориентированный на сегмент профессиональных услуг и аутстаффинга, где контроль времени критичен для биллинга и трудового законодательства.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Salesforce Gives Hibob $166M</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для HR-tech (HRmost, AIR): усилить интеграционные возможности продуктов с крупными HRIS/HCM-системами (включая локальные — 1С, Битрикс24) и позиционировать AIR и HRmost как специализированные модули для российского рынка, которые дополняют, а не конкурируют с платформами полного цикла. Рассмотреть партнёрства или white-label модели.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/salesforce-gives-hibob-166m/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=salesforce-gives-hibob-166m" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/salesforce-gives-hibob-166m/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=salesforce-gives-hibob-166m" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>How Match Group’s CPO rebuilt talent growth after flattening the org</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech: Разработать модуль в HRmost/AIR для управления карьерным развитием и компетенциями в плоских организациях — инструменты горизонтального роста, peer-to-peer обучения, навыковых матриц и внутренней мобильности без традиционного управленческого трека.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Denise Triba – Using HR operational data and AI to improve service delivery</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-ассистента для автоматизации обработки типовых HR-запросов работодателей, обученного на тикетах поддержки и операционных данных Авито.Работы, что снизит нагрузку на саппорт и повысит скорость решения запросов клиентов на 30-40%.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Transform Oracle Recruiting into Intelligent Hiring Workflows at Oracle AI World 2026</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать глубокую интеграцию с популярными корпоративными ATS (Oracle, SAP, 1С:ЗУП) через API, позиционируя HRmost/AIR как «умный слой» поверх существующих систем для российских компаний, автоматизирующий парсинг, скоринг и коммуникацию с кандидатами без миграции данных.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card green">
+    <article class="card green" data-market="HR-tech" data-color="green" data-score="4" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill green">4</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Is Your Organization Adopting AI, or Is AI Adopting Your Organization?</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
       <p class="hyp">Для HR-tech (HRmost/AIR): разработать модуль &#x27;AI Adoption Tracker&#x27; — инструмент для HR-команд, позволяющий отслеживать использование AI сотрудниками, идентифицировать внутренних AI-чемпионов на основе данных, создавать программы peer-to-peer обучения и измерять ROI от AI-инструментов в компании.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/is-your-organization-adopting-ai-or-is-ai-adopting-your-organization/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=is-your-organization-adopting-ai-or-is-ai-adopting-your-organization" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: высокая</p>
+      <p class="meta">
+        <a href="https://hrtechfeed.com/is-your-organization-adopting-ai-or-is-ai-adopting-your-organization/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=is-your-organization-adopting-ai-or-is-ai-adopting-your-organization" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: высокая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>White House takes down ‘Build the Wall’ game after the Tetris Company complains</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech (HRmost/AIR): разработать консалтинговый модуль или чек-лист по compliance при внедрении геймификации в HR-процессы, помогающий работодателям избежать IP-рисков при создании обучающих игр и онбординг-механик для сотрудников.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/white-house-takes-down-build-the-wall-game-after-the-tetris-company-complains/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/white-house-takes-down-build-the-wall-game-after-the-tetris-company-complains/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Hackers are stealing Claude tokens from subscribers</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать защищённую систему управления доступом и мониторинга использования AI-токенов для корпоративных клиентов с алертами о подозрительной активности, что может стать конкурентным преимуществом при продаже AI-функционала в продуктах для автоматизации рекрутинга.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/hackers-are-stealing-claude-tokens-from-subscribers/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/hackers-are-stealing-claude-tokens-from-subscribers/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Cognition hits $48B valuation, signaling investors believe AI coding is far from a winner-take-all market</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-ассистента для рекрутеров, автоматизирующего написание вакансий, скрининг резюме и генерацию персонализированных сообщений кандидатам. Учитывая фрагментацию AI-рынка, специализированный инструмент под задачи HR может захватить нишу быстрее горизонтальных решений.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/cognition-hits-48b-valuation-signaling-investors-believe-ai-coding-is-far-from-a-winner-take-all-market/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/cognition-hits-48b-valuation-signaling-investors-believe-ai-coding-is-far-from-a-winner-take-all-market/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>The Exploration Company nabs $450 million to challenge SpaceX</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech: Разработать специализированный продукт для подбора и оценки редких технических специалистов (aerospace, robotics, deep tech) с использованием AIR для скрининга компетенций и интеграцией с европейскими tech-компаниями, которые конкурируют за ограниченный talent pool.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/the-exploration-company-nabs-450-million-to-challenge-spacex/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/the-exploration-company-nabs-450-million-to-challenge-spacex/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Meta debuts its Muse AI agent. Will consumers trust it?</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-агента для автоматизации рекрутинга, который работает внутри корпоративного контура без передачи данных третьим сторонам, позиционируя Авито.Работу как «доверенную» альтернативу глобальным tech-гигантам для российского рынка труда.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/meta-debuts-its-muse-ai-agent-will-consumers-trust-it/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/meta-debuts-its-muse-ai-agent-will-consumers-trust-it/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>How to watch Apple’s foldable iPhone announcement</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для Авито.Работы (классифайд/джоборды): оптимизировать мобильное приложение под складные экраны с увеличенной площадью, внедрив split-screen режим для одновременного просмотра вакансий и чата с работодателем, что может повысить конверсию в отклики на 15-20% среди владельцев премиум-устройств.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/how-to-watch-apples-foldable-iphone-announcement/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/how-to-watch-apples-foldable-iphone-announcement/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>OpenAI fought dirty on career-making math problem, says NYU mathematician</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech (AIR): разработать продукт для оценки и сертификации навыков работы с ИИ-инструментами для высококвалифицированных специалистов (исследователей, аналитиков, инженеров), позволяющий работодателям проверять не только формальную квалификацию, но и этичность применения ИИ в профессиональной деятельности.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/openai-fought-dirty-on-career-making-math-problem-says-nyu-mathematician/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/openai-fought-dirty-on-career-making-math-problem-says-nyu-mathematician/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Google Cloud races to catch up in the AI deployment wars with Accenture deal</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать модель внедрения AI-инструментов для подбора и управления персоналом с dedicated-командами интеграции на стороне крупных корпоративных клиентов, превращая барьер внедрения в конкурентное преимущество перед точечными SaaS-решениями.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/google-cloud-races-to-catch-up-in-the-ai-deployment-wars-with-accenture-deal/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/google-cloud-races-to-catch-up-in-the-ai-deployment-wars-with-accenture-deal/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Google’s revived nuclear power plant gets $1.9B loan from US government</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech: разработка для продукта AIR предиктивной модели спроса на специалистов энергетического сектора и ядерных технологий, учитывая ожидаемый рост найма в этих областях на фоне ренессанса атомной энергетики в США и возможное расширение подобных проектов в России.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/googles-revived-nuclear-power-plant-gets-1-9b-loan-from-us-government/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/googles-revived-nuclear-power-plant-gets-1-9b-loan-from-us-government/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Chrome is now shipping updates every 2 weeks as AI changes the security landscape</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Интегрировать AI-ассистентов для автоматической оценки кандидатов с усиленным фокусом на безопасность данных и compliance, позиционируя быстрые итерации и патчи безопасности как конкурентное преимущество перед традиционными ATS-системами с медленными циклами обновления.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/chrome-is-now-shipping-updates-every-2-weeks-as-ai-changes-the-security-landscape/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/chrome-is-now-shipping-updates-every-2-weeks-as-ai-changes-the-security-landscape/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Mistral raises €3B as sovereign AI becomes big business</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): интеграция или партнёрство с европейскими AI-провайдерами типа Mistral для создания AI-ассистентов подбора, скрининга резюме и матчинга кандидатов с учётом требований к данным и суверенитету для крупных корпоративных клиентов в РФ и СНГ.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/mistral-raises-e3b-as-sovereign-ai-becomes-big-business/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/mistral-raises-e3b-as-sovereign-ai-becomes-big-business/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>A hacker stole $340M in a crypto heist, then returned most of it</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech: разработать модуль проверки кандидатов на позиции в финтех и криптокомпании с фокусом на кибербезопасность и верификацию навыков в blockchain-security, что может стать премиум-продуктом для растущего сегмента криптовалютных работодателей.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/a-hacker-stole-340m-in-a-crypto-heist-then-returned-most-of-it/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/a-hacker-stole-340m-in-a-crypto-heist-then-returned-most-of-it/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Nuclear startup Bluecore Energy raises $50M seed round, just two months after launch</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (AIR/HRmost): разработать вертикальное решение для найма и оценки кандидатов в deeptech/энергетических стартапах, где критична скорость закрытия позиций инженеров и исследователей на фоне острой конкуренции за таланты и больших бюджетов на наём.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/nuclear-startup-bluecore-energy-raises-50m-seed-round-just-two-months-after-launch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/nuclear-startup-bluecore-energy-raises-50m-seed-round-just-two-months-after-launch/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Poseidon Aerospace lands $60M ahead of first pilotless test flight</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для Авито.Подработка: рост автоматизации в логистике создаёт спрос на гибкую рабочую силу для обслуживания автоматизированных систем, упаковки, сортировки и last-mile доставки. Гипотеза: развитие категорий подработок в логистике и складском деле с акцентом на краткосрочные смены и быстрый онбординг может захватить растущий сегмент вытесняемых, но перераспределяемых рабочих мест.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/poseidon-aerospace-lands-60m-ahead-of-first-pilotless-test-flight/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/poseidon-aerospace-lands-60m-ahead-of-first-pilotless-test-flight/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="1" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill red">1</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Stoke Space raises another billion to rival SpaceX at re-flying rockets</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech: Разработать специализированное решение для найма и оценки редких технических специалистов (aerospace, deep tech) с использованием AIR для компаний в высокотехнологичных отраслях, где конкуренция за таланты максимальна.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/stoke-space-raises-another-billion-to-rival-spacex-at-re-flying-rockets/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/stoke-space-raises-another-billion-to-rival-spacex-at-re-flying-rockets/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Eric Wu’s newest company, out of stealth since May, is going after construction’s labor crunch</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Авито.Подработка может протестировать встроенные AI-гайды для исполнителей в категориях с высокой текучестью (курьеры, грузчики, разнорабочие), снижая время до первого заказа и повышая retention через голосовые подсказки и чек-листы прямо в мобильном приложении.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/eric-wus-newest-company-out-of-stealth-since-may-is-going-after-constructions-labor-crunch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/07/eric-wus-newest-company-out-of-stealth-since-may-is-going-after-constructions-labor-crunch/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Opaque recurrence, and other AI terms that you should probably know</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать образовательный модуль или AI-ассистента для HR-специалистов, который объясняет AI-термины в контексте рекрутинга и помогает понимать возможности AI-инструментов при подборе персонала, позиционируя Авито.Работу как thought leader в AI-driven рекрутменте.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/artificial-intelligence-definition-glossary-hallucinations-guide-to-common-ai-terms/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/07/artificial-intelligence-definition-glossary-hallucinations-guide-to-common-ai-terms/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>A secret new Elizabeth Holmes documentary stuns Telluride</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech (HRmost/AIR): Разработать продуктовую функцию верификации карьерной истории и квалификации кандидатов с использованием открытых данных и AI, позиционируя её как инструмент снижения репутационных рисков при найме топ-менеджеров и специалистов в высокорискованных отраслях.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/a-secret-new-elizabeth-holmes-documentary-stuns-telluride/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/07/a-secret-new-elizabeth-holmes-documentary-stuns-telluride/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>What we expect from the upcoming Apple launch</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">Для HR-tech (AIR/HRmost): разработать оптимизированный UX для складных устройств в продуктах подбора и рекрутинга, позволяющий использовать увеличенную площадь экрана для одновременного просмотра резюме и коммуникации с кандидатами, ориентируясь на премиум-сегмент работодателей</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/what-we-expect-from-the-upcoming-apple-launch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/07/what-we-expect-from-the-upcoming-apple-launch/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-06">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
       <h3>Phil Schiller’s App Store exit reportedly driven by wariness over future plans</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
       <p class="hyp">HR-tech: разработать веб-first или прогрессивное веб-приложение (PWA) для продуктов HRmost и AIR, снижающее зависимость от App Store и комиссий Apple, с возможностью прямой подписочной модели и большей гибкостью в монетизации для клиентов.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/06/phil-schillers-app-store-exit-reportedly-driven-by-wariness-over-future-plans/" target="_blank" rel="noopener">ссылка</a> · 2026-09-06 · уверенность: низкая</p>
-    </article></section><section class="market-panel" data-market="HR-tech">
-    <article class="card yellow">
-      <div class="card-top">
-        <span class="pill yellow">3.6</span>
-        <span class="status">review</span>
-      </div>
-      <h3>Alex lands $20M to automate AI recruiting workflows</h3>
-      <p class="hyp">Расширить AIR от точечного AI-скрининга к end-to-end автоматизации воронки (интервью + fraud-детекция + ATS-интеграция) как апсейл-модуль для HR-tech клиентов Авито.Работы.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/ai-powered-recruiting-startup-lands-20-million/" target="_blank" rel="noopener">ссылка</a> · 2025-09-29 · уверенность: Низкая-средняя — единственный сигнал, дата вне целевого окна (июнь–август 2026), нужен повторный поиск на аналогичные раунды именно в этот период.</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/06/phil-schillers-app-store-exit-reportedly-driven-by-wariness-over-future-plans/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-06
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-09">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>HR Tech Exec Announcements</h3>
-      <p class="hyp">Для продуктов HRmost и AIR: разработать и продвигать сертифицированные функции безопасности данных и комплаенса как конкурентное преимущество при работе с крупными корпоративными клиентами, озабоченными защитой персональных данных сотрудников.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/hr-tech-exec-announcements-4/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=hr-tech-exec-announcements-4" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <h3>Google DeepMind alumni are building tools to accelerate fusion power for the grid</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (AIR): развивать ML-модели глубокого обучения для предиктивного матчинга и симуляции карьерных траекторий кандидатов, используя опыт применения ИИ в сложных системах. Создать «симуляционную среду» для работодателей, позволяющую моделировать эффективность различных стратегий найма и управления персоналом до их реального внедрения.</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/google-deepmind-alumni-are-building-tools-to-accelerate-fusion-power-for-the-grid/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-09">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>SIA Report: The Digital Workforce in Recruitment 2026</h3>
-      <p class="hyp">HR-tech: Разработать в AIR/HRmost функционал управления гибридными командами (человек + AI-агент), позволяющий работодателям распределять задачи между людьми и цифровыми агентами, отслеживать их взаимодействие и оптимизировать затраты на персонал с учётом новой реальности &#x27;цифровой рабочей силы&#x27;.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/sia-report-the-digital-workforce-in-recruitment-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=sia-report-the-digital-workforce-in-recruitment-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>CloudNC raises $20M to automate manufacturing’s most pressing bottlenecks</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для Авито.Подработка: развитие вертикали производственных подработок с интеграцией инструментов планирования смен и автоматического матчинга квалифицированных рабочих (операторы ЧПУ, сборщики) с производственными заказчиками, где платформа берёт на себя транзакцию и гарантии.</p>
+      <p class="meta">
+        <a href="https://techcrunch.com/2026/09/08/cloudnc-raises-20m-to-automate-manufacturings-most-pressing-bottlenecks/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card green">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Mistral AI Raises $3.5B At $24B Valuation In Another Record European AI Round</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): интеграция доступных европейских LLM (Mistral) для автоматизации скрининга резюме, генерации описаний вакансий и чат-ботов поддержки соискателей может снизить зависимость от дорогих API OpenAI/Google и обеспечить конкурентное преимущество по цене при сопоставимом качестве.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/europe-record-setting-mistral-ai-raise/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-04">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>The Week’s 10 Biggest Funding Rounds: Crusoe And Fluidstack Lead Multibillion-Dollar AI Infrastructure Haul</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): усилить позиционирование AI-возможностей продуктов (скоринг резюме, матчинг, автоматизация коммуникации) как конкурентное преимущество перед игроками без доступа к вычислительным ресурсам; рассмотреть партнёрства с AI-инфраструктурными провайдерами для масштабирования сложных ML-моделей при работе с большими объёмами вакансий/резюме.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/biggest-funding-rounds-crusoe-fluidstack-multibillion-dollar-ai-infrastructure/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-04">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>A Startup General Counsel Knew What Corporate Lawyers Needed From AI. So She Built It.</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost и AIR): разработать AI-ассистента для HR-специалистов и рекрутеров, автоматизирующего проверку резюме на соответствие трудовому законодательству, генерацию типовых трудовых договоров и офферов, консультирование по вопросам compliance при найме. Это снизит барьер входа для малого и среднего бизнеса в использование продуктов Авито.Работы и увеличит ARPU за счёт дополнительного модуля.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/nontech-startup-general-counsel-built-legal-tech-gc-ai-ziniti/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-03">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Global Venture Funding Jumps 122% In August As Streak Of Billion-Dollar Deals Continues</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost, AIR): активизация венчурного рынка создаёт окно для привлечения внешнего финансирования под масштабирование продуктов или для M&amp;A недооценённых HR-tech стартапов с комплементарными технологиями (AI-рекрутинг, автоматизация HR-процессов), пока конкуренция за активы не выросла.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/global-funding-billion-dollar-deals-august-2026/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-02">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Former Apple Engineers’ Physical AI Startup Lyte Raises $165M At $1.6B Valuation</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для Авито.Подработка: мониторить влияние роботизации на сегменты курьеров, складских работников и других исполнителей физического труда; разработать продукты для переквалификации и перехода работников из автоматизируемых категорий в растущие сегменты (например, обслуживание роботов, операторы автоматизированных систем).</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/robotics-ai-startup-lyte-seriesc-raise-maverick/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-02
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Классифайд" data-color="yellow" data-score="3" data-date="2026-09-02">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>The IPO Window Is Closing. Here Are 8 Startups To Watch.</h3>
+      <div class="badges"><span class="pill market">Классифайд</span></div>
+      <p class="hyp">HR-tech: Разработать продукт для быстрого масштабирования найма (bulk hiring) и аналитики retention для венчурных компаний в фазе pre/post-IPO через HRmost/AIR, таргетируя стартапы с оценкой $500M+ как премиум-сегмент с высоким LTV.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/public/startups-to-watch-ipo-ai-chips-fintech-2026/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-02
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-09-01">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>WhatsApp Remittance Startup Félix Secures $200M Series C Led By A16z, General Catalyst</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">Запустить пилот Авито.Подработка в формате Telegram/WhatsApp-бота для поиска подработок мигрантами и низкоквалифицированными работниками: быстрый поиск заказов, коммуникация с работодателем и транзакционные функции (оплата, эскроу) внутри привычного мессенджера, минимизируя барьеры входа и повышая конверсию в выполнение задач.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/fintech-whatsapp-remittance-startup-felix-raises-200m-a16z-general-catalyst/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-01
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-01">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Sector Snapshot: Proptech Funding Holds Up, But Investors Are Placing Different Bets</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Авито.Подработка может развить специализированное вертикальное решение для строительных и управляющих компаний, интегрирующее быстрый найм временного персонала (разнорабочие, уборщики, мастера) с AI-инструментами для планирования смен и оценки исполнителей, закрывая потребность proptech-компаний в гибкой рабочей силе.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/proptech-funding-holds-exits-ipo-ai-green-steel-2026/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-01
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-08-31">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Biotech Startup Investment Held Steady Even As AI Funding Surged</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): разработать отраслевые решения для подбора и оценки кандидатов в стабильных non-AI секторах (биотех, фарма, производство), где компании могут искать альтернативу дорогим AI-ориентированным инструментам и нуждаются в классических, но качественных HR-процессах.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/health-wellness-biotech/startup-investment-exits-steady-ai-2026/" target="_blank" rel="noopener">источник</a>
+        · 2026-08-31
+        · уверенность: низкая
+        
+      </p>
+    </article>
+    <article class="card green" data-market="Не определено" data-color="green" data-score="4" data-date="2026-08-28">
       <div class="card-top">
         <span class="pill green">4</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>ADP Partners with AWS to Accelerate AI-Powered Innovation in Human Capital Management</h3>
-      <p class="hyp">HR-tech: интегрировать AI-возможности (на базе Yandex Cloud или собственных LLM) в HRmost и AIR для автоматизации скрининга резюме, генерации job description, чат-ботов для кандидатов и предиктивной аналитики текучести — позиционируясь как &#x27;AI-native&#x27; альтернатива для российского рынка, где западные решения ушли.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=adp-partners-with-aws-to-accelerate-ai-powered-innovation-in-human-capital-management" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>The Week’s 10 Biggest Funding Rounds: AI Tools And Assistants Lead Sparser Lineup Of Megadeals</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): разработать AI-ассистента для автоматизации рекрутинга — от скрининга резюме и автоматических откликов до подбора кандидатов по смысловому соответствию, используя LLM для анализа вакансий и профилей соискателей.</p>
+      <p class="meta">
+        <a href="https://news.crunchbase.com/venture/biggest-funding-rounds-ai-tools-assistants-instinct/" target="_blank" rel="noopener">источник</a>
+        · 2026-08-28
+        · уверенность: средняя
+        
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2020-12-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>3 out of 4 gen AI users fear for their job security</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать продукт или модуль для работодателей, помогающий управлять коммуникацией вокруг внедрения AI — прозрачные планы трансформации ролей, программы переобучения, мэтчинг сотрудников на новые позиции внутри компании. Это снизит тревожность, повысит retention и позиционирует Авито.Работу как ответственного партнёра в AI-трансформации.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/3-out-of-4-gen-ai-users-fear-for-their-job-security/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=3-out-of-4-gen-ai-users-fear-for-their-job-security" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>Year in Review 2020: Assessment</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): разработать или интегрировать модуль удалённой оценки кандидатов (видеоинтервью, тестирования, асинхронные форматы) для работодателей, что усилит value proposition платформы и повысит конверсию в платные тарифы за счёт закрытия всего цикла найма внутри экосистемы Авито.Работы.</p>
+      <p class="meta">
+        <a href="https://www.recruitingbrainfood.com/year-in-review-2020-assessment/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=year-in-review-2020-assessment" target="_blank" rel="noopener">источник</a>
+        · 2020-12-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-09">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Performance Management and Integration center: How to export ratings in every step via IC</h3>
-      <p class="hyp">HR-tech: Разработать в HRmost модуль экспорта детализированных данных по оценке эффективности сотрудников с возможностью кастомизации выгрузок по этапам и метрикам, что повысит привлекательность продукта для средних и крупных компаний, нуждающихся в интеграции с BI-системами и продвинутой аналитике.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=performance-management-and-integration-center-how-to-export-ratings-in-every-step-via-ic" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <h3>DACH &amp; CEE: the data behind the region&#x27;s fastest-growing startups</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: изучить бизнес-модели и продуктовые фичи быстрорастущих HR-tech и рекрутинг-стартапов из CEE/DACH для адаптации успешных практик в продуктах HRmost и AIR, особенно в области автоматизации подбора и аналитики.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/dach-cee-the-data-behind-the-regions-fastest-growing-startups/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-09">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>What’s New in Rollie – September 8, 2026</h3>
-      <p class="hyp">Для HR-tech продуктов (HRmost/AIR): провести аудит собственной data-архитектуры и оценить готовность к масштабированию аналитических возможностей. Возможность создать конкурентное преимущество через упреждающее развитие data-инфраструктуры для AI-функций и предиктивной аналитики по HR-метрикам до того, как конкуренты выйдут с новыми продуктами.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/whats-new-in-rollie-september-8-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=whats-new-in-rollie-september-8-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
+      <h3>Exclusive: Mistral robotics chief seeks €200m for new startup</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для Авито.Подработка: запустить категорию &#x27;гибридных&#x27; вакансий, где работодатели указывают степень автоматизации/робототехники на рабочем месте, помогая соискателям выбирать устойчивые к автоматизации позиции и формируя датасет для прогнозирования трансформации рынка труда.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/exclusive-mistral-robotics-chief-seeks-e200m-for-new-startup/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-09">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Prague-based SME lender Flowpay tops latest Sifted ranking</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для рынка HR-tech: интеграция финансовых продуктов (зарплатные авансы, кредитование на фонд оплаты труда) в HRmost/AIR может повысить retention работодателей-SMB, испытывающих кассовые разрывы при масштабировании найма.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/prague-flowpay-tops-ranking/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-09">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>This startup acquired four companies in its first eight months. Now it’s raised €36m to buy more</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): рассмотреть возможность неорганического роста через приобретение нишевых игроков в сегментах автоматизации рекрутинга, ATS-систем или инструментов оценки кандидатов для быстрого расширения продуктовой линейки и клиентской базы в b2b-сегменте.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/limetax-pre-seed-fundraise/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-09
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>The Exploration Company raises $450m</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Разработать специализированный продукт для подбора и оценки редких технических специалистов (aerospace, deep tech) на базе AIR, включая интеграцию с профильными сообществами и вертикализированные инструменты скрининга компетенций.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/exploration-company-450m-series-c/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Recruiting and hiring: Where AI delegation meets exposure and exclusion</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): разработать и вывести на рынок AI-инструменты для рекрутинга с встроенным compliance-модулем, обеспечивающим прозрачность решений, аудит на предмет дискриминации и соответствие трудовому законодательству РФ. Позиционировать как &#x27;безопасный ИИ для найма&#x27;, снижающий юридические риски работодателя.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=recruiting-and-hiring-where-ai-delegation-meets-exposure-and-exclusion" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <h3>Mistral confirms €3bn Series D at €21bn valuation</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): Интегрировать или развить собственные LLM-возможности для автоматизации скрининга резюме, генерации вакансий, чат-ботов для кандидатов и предиктивной аналитики подбора. Партнёрство с Mistral или аналогами может ускорить differentiation продуктов HRmost/AIR на фоне традиционных ATS.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/mistral-series-d-3bn/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Am I a fake founder? What it’s like joining a startup as a cofounder a year late</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): создать продукт для матчинга стартапов с поздними со-основателями — базу кандидатов уровня C-level/VP, готовых войти в equity, с инструментами для структурирования таких сделок (калькуляторы vesting, шаблоны соглашений, верификация компетенций). Монетизация через подписку для стартапов + премиум-размещение для кандидатов.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/am-i-a-fake-founder-what-its-like-joining-a-startup-as-a-cofounder-a-year-late/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-08">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>‘You cannot sue an AI’: Why adoption comes down to people, not platforms</h3>
-      <p class="hyp">Для продуктов HRmost и AIR: разработать модуль онбординга и обучения работодателей/HR-специалистов работе с AI-функциями платформы, включающий guided tours, контекстные подсказки и систему сертификации пользователей, что повысит retention и глубину использования платных AI-функций.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=you-cannot-sue-an-ai-why-adoption-comes-down-to-people-not-platforms" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <h3>Exclusive: Legaltech Lexroom seals first two M&amp;A deals four months after $50m Series B</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Рассмотреть стратегию консолидации через M&amp;A небольших специализированных HR-tech решений (ATS, assessments, onboarding) для интеграции в экосистему HRmost/AIR, создавая комплексную платформу управления талантами с конкурентным преимуществом перед точечными решениями.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/exclusive-legaltech-lexroom-seals-first-two-ma-deals-four-months-after-50m-series-b/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Matt Clifford quits ARIA after Anthropic conflict of interest concerns</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (AIR): усилить позиционирование AI-инструментов подбора и скрининга как этичных и прозрачных, внедрить публичные стандарты объяснимости алгоритмов и отсутствия дискриминации — это может стать конкурентным преимуществом при работе с крупными корпоративными клиентами и госсектором, где растут требования к compliance.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/matt-clifford-quits-aria/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Exclusive: Jack &amp; Jill raises £30m led by Air Street</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (AIR/HRmost): изучить модель Jack &amp; Jill на предмет применимых AI-функций для автоматизации рекрутинга или матчинга кандидатов; рассмотреть возможность партнерства или M&amp;A для быстрого усиления AI-возможностей продуктов Авито.Работы на российском рынке.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/exclusive-jack-jill-30m/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>UK government seeks fund manager for £150m northern scaleup fund</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Развитие специализированных продуктов для региональных рынков труда в РФ на платформе Авито.Подработка: локализованные предложения подработок с учётом специфики экономики регионов, возможно с партнёрством местных администраций для стимулирования занятости.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/uk-launches-150m-north-of-england-scaleup-fund/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Automate Business Processes and Ensure Data Quality with Workflows in Employee Central</h3>
-      <p class="hyp">Добавить в HRmost или AIR конструктор настраиваемых workflows для автоматизации типовых HR-процессов (согласование отпусков, онбординг, изменение данных), что повысит привлекательность продуктов для средних и крупных компаний, ищущих альтернативу дорогим западным системам.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=automate-business-processes-and-ensure-data-quality-with-workflows-in-employee-central" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: средняя</p>
+      <h3>The DeepMind mafia building startups in Europe</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: установить партнёрства или отслеживать стартапы из «DeepMind mafia» для интеграции их AI-решений в продукты HRmost и AIR — например, для улучшения матчинга кандидатов, автоматизированного скрининга резюме или предиктивной аналитики текучести кадров.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/investors-have-poured-billions-into-the-deepmind-mafia/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Built for Change: Tracey Friend’s Career Crossroads</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): разработать образовательный контент или community-функционал для TA-специалистов о трансформации роли рекрутера в эпоху AI, позиционируя продукты как enabler карьерного роста, а не угрозу замещения.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/built-for-change-tracey-friends-career-crossroads/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=built-for-change-tracey-friends-career-crossroads" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Guardian Jobs is Closing.</h3>
-      <p class="hyp">Для рынка Классифайд/джоборды: усилить позиционирование Авито.Работы как универсального агрегатора с акцентом на локальность и широту охвата вакансий, которую не могут обеспечить узкоспециализированные или медийные джоборды. Возможность привлечь работодателей и аудиторию, оставшихся без привычного канала в аналогичных случаях локальных закрытий.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/guardian-jobs-is-closing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=guardian-jobs-is-closing" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Consolidated Time Recording (CTR) in New SAP S/4HANA Public Cloud Timesheet App for Prof Services</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): разработать lightweight модуль учёта рабочего времени с акцентом на compliance для российского рынка, интегрированный с существующими продуктами HRmost, ориентированный на сегмент профессиональных услуг и аутстаффинга, где контроль времени критичен для биллинга и трудового законодательства.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=consolidated-time-recording-ctr-in-new-sap-s-4hana-public-cloud-timesheet-app-for-prof-services" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
-    </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Salesforce Gives Hibob $166M</h3>
-      <p class="hyp">Для HR-tech (HRmost, AIR): усилить интеграционные возможности продуктов с крупными HRIS/HCM-системами (включая локальные — 1С, Битрикс24) и позиционировать AIR и HRmost как специализированные модули для российского рынка, которые дополняют, а не конкурируют с платформами полного цикла. Рассмотреть партнёрства или white-label модели.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/salesforce-gives-hibob-166m/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=salesforce-gives-hibob-166m" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <h3>Hugging Face’s $12.9bn sale is both inspiring and dispiriting for Europe</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): Разработать собственные AI-инструменты для автоматизации подбора и скрининга на базе открытых моделей до их монополизации крупными платформами. Позиционировать как &#x27;суверенное&#x27; HR-tech решение для российского рынка с акцентом на независимость от зарубежной AI-инфраструктуры.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/sifted-view-hugging-face/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-07">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>How Match Group’s CPO rebuilt talent growth after flattening the org</h3>
-      <p class="hyp">HR-tech: Разработать модуль в HRmost/AIR для управления карьерным развитием и компетенциями в плоских организациях — инструменты горизонтального роста, peer-to-peer обучения, навыковых матриц и внутренней мобильности без традиционного управленческого трека.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=how-match-groups-cpo-rebuilt-talent-growth-after-flattening-the-org" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <h3>Exclusive: DeepMind veteran Thore Graepel quits to pursue AI reasoning venture</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: интегрировать AI reasoning в продукты HRmost/AIR для автоматизации сложных HR-процессов — интеллектуального скрининга кандидатов с многофакторной оценкой компетенций, автоматического построения карьерных треков и персонализированных рекомендаций по развитию, что создаст конкурентное преимущество перед классическими ATS.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/thore-graepel-deepmind-reason/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>17 startup and investor hotspots in Stockholm</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: изучить успешные модели стокгольмских HR-tech стартапов для адаптации их практик (например, AI-рекрутинг, skills matching) в продуктах HRmost и AIR, а также рассмотреть возможность партнерств или M&amp;A с перспективными скандинавскими решениями для ускорения технологического развития.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/17-startup-hotspots-in-stockholm/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Nordics leaderboard: the data behind the region’s fastest-growing startups</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Провести бенчмаркинг топ-3 быстрорастущих HR-tech/workforce стартапов из Nordics для выявления инновационных функций (AI-скрининг, skills matching, автоматизация onboarding), которые можно интегрировать в HRmost и AIR для повышения конкурентоспособности на российском рынке корпоративных HR-решений.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/nordics-leaderboard-data-behind-regions-fastest-growing-startups/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-07">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Claret Capital raises €575m for fourth debt fund as ‘less sexy’ startups need access</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost и AIR): изучить возможность партнёрства с долговыми фондами для предложения клиентам (работодателям) гибких схем финансирования найма или подписок на HR-продукты, что может снизить барьер входа для средних компаний и увеличить retention.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/claret-capital-venture-debt-ai-fund/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-07
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-05">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>German spacetech Isar Aerospace’s second rocket launch reaches orbit in milestone</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Разработать специализированный продукт для рекрутинга в высокотехнологичных отраслях (aerospace, deep tech) с фокусом на редкие инженерные компетенции, интегрировав в HRmost инструменты оценки технических навыков и базу кандидатов с профилем в космической/авиационной индустрии для выхода на европейский рынок.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/isar-aerospace-test-flight-orbit/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-05
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Denise Triba – Using HR operational data and AI to improve service delivery</h3>
-      <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-ассистента для автоматизации обработки типовых HR-запросов работодателей, обученного на тикетах поддержки и операционных данных Авито.Работы, что снизит нагрузку на саппорт и повысит скорость решения запросов клиентов на 30-40%.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=denise-triba-using-hr-operational-data-and-ai-to-improve-service-delivery" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <h3>Exclusive: H cofounder Laurent Sifre joins Microsoft</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Усилить AI-функционал в продуктах HRmost и AIR (скрининг резюме, прогнозирование успешности найма, автоматизация первичных интервью) до того, как крупные игроки вроде Microsoft выведут конкурирующие решения на российский рынок или через партнеров.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/exclusive-h-cofounder-laurent-sifre-joins-microsoft/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-04">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Bessemer and Creandum set to back new AI infrastructure startup at $600m valuation, sources say</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (AIR): разработать или интегрировать AI-инфраструктурные компоненты для масштабирования собственных ML-моделей подбора и скрининга кандидатов, что позволит улучшить качество матчинга и снизить стоимость обработки заявок при росте базы пользователей.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/bessemer-creandum-gridfield/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-04">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>The top 10 investors in the Nordics</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Изучить портфельные компании топовых нордических инвесторов в сегменте HR-tech для выявления потенциальных технологических партнёрств, приобретений или адаптации лучших практик (например, AI-рекрутинг, инструменты для платформенной занятости) под продукты HRmost и AIR.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/the-top-investors-behind-sifteds-nordics-2026-leaderboard/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Transform Oracle Recruiting into Intelligent Hiring Workflows at Oracle AI World 2026</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать глубокую интеграцию с популярными корпоративными ATS (Oracle, SAP, 1С:ЗУП) через API, позиционируя HRmost/AIR как «умный слой» поверх существующих систем для российских компаний, автоматизирующий парсинг, скоринг и коммуникацию с кандидатами без миграции данных.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=transform-oracle-recruiting-into-intelligent-hiring-workflows-at-oracle-ai-world-2026" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: средняя</p>
+      <h3>Why Legora isn&#x27;t building its own model</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Ускорить развитие AI-функционала в HRmost и AIR через интеграцию готовых LLM (GPT-4, Claude) вместо разработки с нуля, сфокусировавшись на создании уникальных промптов и датасетов на основе данных Авито.Работы для скрининга резюме, матчинга и автоматизации рекрутинга.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/why-legora-isnt-building-its-own-model/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card green">
-      <div class="card-top">
-        <span class="pill green">4</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Is Your Organization Adopting AI, or Is AI Adopting Your Organization?</h3>
-      <p class="hyp">Для HR-tech (HRmost/AIR): разработать модуль &#x27;AI Adoption Tracker&#x27; — инструмент для HR-команд, позволяющий отслеживать использование AI сотрудниками, идентифицировать внутренних AI-чемпионов на основе данных, создавать программы peer-to-peer обучения и измерять ROI от AI-инструментов в компании.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/is-your-organization-adopting-ai-or-is-ai-adopting-your-organization/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=is-your-organization-adopting-ai-or-is-ai-adopting-your-organization" target="_blank" rel="noopener">ссылка</a> · 2026-09-03 · уверенность: высокая</p>
-    </article></section><section class="market-panel" data-market="Классифайд">
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>This Profitable Job Board Charges Seekers</h3>
-      <p class="hyp">Для рынка Классифайд/джобборды: протестировать премиум-подписку для соискателей в дефицитных или высокооплачиваемых категориях (IT, топ-менеджмент, редкие специальности), дающую приоритетное размещение резюме, эксклюзивный доступ к закрытым вакансиям и персональную поддержку. Валидировать willingness to pay через A/B-тест на 2-3 вертикалях с конверсией в paid pilot.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/this-profitable-job-board-charges-seekers/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=this-profitable-job-board-charges-seekers" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article></section><section class="market-panel" data-market="Не определено">
-    <article class="card red">
+      <h3>Revolut clears first hurdle to US banking licence</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: разработка интеграции с банковскими API для мгновенных выплат зарплат и подработок через партнёрство с финтех-платформами, что может стать конкурентным преимуществом для HRmost и AIR при работе с международными клиентами и фрилансерами.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/revolut-us-banking-licence-2/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>White House takes down ‘Build the Wall’ game after the Tetris Company complains</h3>
-      <p class="hyp">Для HR-tech (HRmost/AIR): разработать консалтинговый модуль или чек-лист по compliance при внедрении геймификации в HR-процессы, помогающий работодателям избежать IP-рисков при создании обучающих игр и онбординг-механик для сотрудников.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/white-house-takes-down-build-the-wall-game-after-the-tetris-company-complains/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <h3>&#x27;Our companies are becoming excellent at surviving and worse at scaling&#x27;: what&#x27;s gone wrong with Nordic fintech</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): усилить позиционирование продуктов как помощников в эффективном масштабировании компаний через автоматизацию рекрутинга и управления персоналом — особенно для финтех и tech-сегментов, испытывающих давление на операционную эффективность при росте.</p>
+      <p class="meta">
+        <a href="https://sifted.eu/articles/nordic-fintech-growth-decline/" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-09-08">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Think your EV holds its value? China has some bad news for you</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для Авито.Подработка: разработать специализированную категорию вакансий с фильтром по типу транспорта (ДВС/электро), чтобы помочь исполнителям принимать информированные решения о покупке авто для работы; создать образовательный контент о TCO разных типов транспорта для курьеров и таксистов, позиционируя платформу как эксперта в экономике гиг-занятости.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/china-used-ev-depreciation-five-year-battery-warranty-dealers/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-08
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-04">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Hackers are stealing Claude tokens from subscribers</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать защищённую систему управления доступом и мониторинга использования AI-токенов для корпоративных клиентов с алертами о подозрительной активности, что может стать конкурентным преимуществом при продаже AI-функционала в продуктах для автоматизации рекрутинга.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/hackers-are-stealing-claude-tokens-from-subscribers/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>Chinese businesses are giving away AI tokens with coffee, credit cards, and dumplings</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (AIR/HRmost): Авито.Работа может запустить программу распределения AI-кредитов на использование AIR через партнёрства с массовыми брендами (банки, ритейл, кафе) — работодатели-МСП получают токены на AI-подбор при покупках/транзакциях, снижая барьер входа в платные HR-tech продукты и формируя привычку использования AIR в сегменте, где конверсия из бесплатных инструментов традиционно низкая.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/china-ai-tokens-consumer-rewards-credit-cards-telcos-deepseek/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-04
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-03">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Cognition hits $48B valuation, signaling investors believe AI coding is far from a winner-take-all market</h3>
-      <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-ассистента для рекрутеров, автоматизирующего написание вакансий, скрининг резюме и генерацию персонализированных сообщений кандидатам. Учитывая фрагментацию AI-рынка, специализированный инструмент под задачи HR может захватить нишу быстрее горизонтальных решений.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/cognition-hits-48b-valuation-signaling-investors-believe-ai-coding-is-far-from-a-winner-take-all-market/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>I refused to train the AI that could replace me</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): разработать продукт для оценки рисков автоматизации позиций и построения карьерных треков с учётом AI-трансформации, помогая компаниям планировать переобучение сотрудников и снижать сопротивление внедрению ИИ. Монетизация через B2B-подписку для HR-департаментов.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/ai-training-jobs-expert-replacement/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-03
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="HR-tech" data-color="red" data-score="2" data-date="2026-09-02">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>The Exploration Company nabs $450 million to challenge SpaceX</h3>
-      <p class="hyp">HR-tech: Разработать специализированный продукт для подбора и оценки редких технических специалистов (aerospace, robotics, deep tech) с использованием AIR для скрининга компетенций и интеграцией с европейскими tech-компаниями, которые конкурируют за ограниченный talent pool.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/the-exploration-company-nabs-450-million-to-challenge-spacex/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <h3>Taiwan’s six-year hunt for China’s undercover chip labs</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">HR-tech: Разработать модуль верификации работодателей и комплаенс-проверки для AIR/HRmost, который помогает компаниям выявлять скрытые аффилиации кандидатов или работодателей в чувствительных отраслях (микроэлектроника, IT, оборонка), снижая риски утечки технологий и соответствуя возможным будущим требованиям регуляторов РФ.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/taiwan-china-chip-investigations/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-02
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-09-01">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Meta debuts its Muse AI agent. Will consumers trust it?</h3>
-      <p class="hyp">Для HR-tech (HRmost/AIR): разработать AI-агента для автоматизации рекрутинга, который работает внутри корпоративного контура без передачи данных третьим сторонам, позиционируя Авито.Работу как «доверенную» альтернативу глобальным tech-гигантам для российского рынка труда.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/meta-debuts-its-muse-ai-agent-will-consumers-trust-it/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>AI safety is designed in the West, and failing users everywhere</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (AIR): разработать локализованные гарантии безопасности и релевантности для ИИ-инструментов скрининга и подбора, адаптированные к российскому трудовому законодательству, культурному контексту и языку, как конкурентное преимущество перед западными HR-tech решениями.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/ai-safety-bias/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-09-01
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
     </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>How to watch Apple’s foldable iPhone announcement</h3>
-      <p class="hyp">Для Авито.Работы (классифайд/джоборды): оптимизировать мобильное приложение под складные экраны с увеличенной площадью, внедрив split-screen режим для одновременного просмотра вакансий и чата с работодателем, что может повысить конверсию в отклики на 15-20% среди владельцев премиум-устройств.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/how-to-watch-apples-foldable-iphone-announcement/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>OpenAI fought dirty on career-making math problem, says NYU mathematician</h3>
-      <p class="hyp">Для HR-tech (AIR): разработать продукт для оценки и сертификации навыков работы с ИИ-инструментами для высококвалифицированных специалистов (исследователей, аналитиков, инженеров), позволяющий работодателям проверять не только формальную квалификацию, но и этичность применения ИИ в профессиональной деятельности.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/openai-fought-dirty-on-career-making-math-problem-says-nyu-mathematician/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-08-31">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Google Cloud races to catch up in the AI deployment wars with Accenture deal</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать модель внедрения AI-инструментов для подбора и управления персоналом с dedicated-командами интеграции на стороне крупных корпоративных клиентов, превращая барьер внедрения в конкурентное преимущество перед точечными SaaS-решениями.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/google-cloud-races-to-catch-up-in-the-ai-deployment-wars-with-accenture-deal/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>Meta accepts U.S. safety rules while pitching softer tools abroad</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Авито.Подработка: превентивно внедрить верифицированный возрастной онбординг (16+/18+) и инструменты родительского согласия для несовершеннолетних исполнителей, позиционируя платформу как безопасную и compliant до того, как регулятор потребует это принудительно, что создаст конкурентное преимущество и снизит репутационные риски.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/meta-influencer-campaign-teen-accounts-under-16-social-media-ban/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-31
+        · уверенность: средняя
+        
+      </p>
     </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Google’s revived nuclear power plant gets $1.9B loan from US government</h3>
-      <p class="hyp">HR-tech: разработка для продукта AIR предиктивной модели спроса на специалистов энергетического сектора и ядерных технологий, учитывая ожидаемый рост найма в этих областях на фоне ренессанса атомной энергетики в США и возможное расширение подобных проектов в России.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/googles-revived-nuclear-power-plant-gets-1-9b-loan-from-us-government/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Chrome is now shipping updates every 2 weeks as AI changes the security landscape</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Интегрировать AI-ассистентов для автоматической оценки кандидатов с усиленным фокусом на безопасность данных и compliance, позиционируя быстрые итерации и патчи безопасности как конкурентное преимущество перед традиционными ATS-системами с медленными циклами обновления.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/chrome-is-now-shipping-updates-every-2-weeks-as-ai-changes-the-security-landscape/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-08-28">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Mistral raises €3B as sovereign AI becomes big business</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): интеграция или партнёрство с европейскими AI-провайдерами типа Mistral для создания AI-ассистентов подбора, скрининга резюме и матчинга кандидатов с учётом требований к данным и суверенитету для крупных корпоративных клиентов в РФ и СНГ.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/mistral-raises-e3b-as-sovereign-ai-becomes-big-business/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>I went to China to see a different AI future. It looked familiar</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost, AIR): адаптировать лучшие практики AI-инструментов из китайского рынка рекрутинга (автоматизация скрининга, матчинг кандидатов) с учётом того, что технологические барьеры между рынками снижаются, что ускорит внедрение AI-функций.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/china-us-ai-future/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-28
+        · уверенность: средняя
+        
+      </p>
     </article>
-    <article class="card red">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-08-27">
       <div class="card-top">
         <span class="pill red">2</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>A hacker stole $340M in a crypto heist, then returned most of it</h3>
-      <p class="hyp">Для HR-tech: разработать модуль проверки кандидатов на позиции в финтех и криптокомпании с фокусом на кибербезопасность и верификацию навыков в blockchain-security, что может стать премиум-продуктом для растущего сегмента криптовалютных работодателей.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/a-hacker-stole-340m-in-a-crypto-heist-then-returned-most-of-it/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
+      <h3>India’s data center boom is leaving the people it displaces with nothing</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Авито.Подработка может масштабировать модель за пределы России на развивающиеся рынки (Индия, Юго-Восточная Азия), где технологический бум создаёт одновременно высокий спрос на гибкую занятость в логистике/обслуживании дата-центров и предложение вытесненной рабочей силы, нуждающейся в быстром трудоустройстве.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/india-data-center-boom-local-community-impact-osama-manzar/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-27
+        · уверенность: низкая
+        
+      </p>
     </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Nuclear startup Bluecore Energy raises $50M seed round, just two months after launch</h3>
-      <p class="hyp">HR-tech (AIR/HRmost): разработать вертикальное решение для найма и оценки кандидатов в deeptech/энергетических стартапах, где критична скорость закрытия позиций инженеров и исследователей на фоне острой конкуренции за таланты и больших бюджетов на наём.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/nuclear-startup-bluecore-energy-raises-50m-seed-round-just-two-months-after-launch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Poseidon Aerospace lands $60M ahead of first pilotless test flight</h3>
-      <p class="hyp">Для Авито.Подработка: рост автоматизации в логистике создаёт спрос на гибкую рабочую силу для обслуживания автоматизированных систем, упаковки, сортировки и last-mile доставки. Гипотеза: развитие категорий подработок в логистике и складском деле с акцентом на краткосрочные смены и быстрый онбординг может захватить растущий сегмент вытесняемых, но перераспределяемых рабочих мест.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/poseidon-aerospace-lands-60m-ahead-of-first-pilotless-test-flight/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">1</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Stoke Space raises another billion to rival SpaceX at re-flying rockets</h3>
-      <p class="hyp">HR-tech: Разработать специализированное решение для найма и оценки редких технических специалистов (aerospace, deep tech) с использованием AIR для компаний в высокотехнологичных отраслях, где конкуренция за таланты максимальна.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/08/stoke-space-raises-another-billion-to-rival-spacex-at-re-flying-rockets/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: низкая</p>
-    </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-08-26">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Eric Wu’s newest company, out of stealth since May, is going after construction’s labor crunch</h3>
-      <p class="hyp">Авито.Подработка может протестировать встроенные AI-гайды для исполнителей в категориях с высокой текучестью (курьеры, грузчики, разнорабочие), снижая время до первого заказа и повышая retention через голосовые подсказки и чек-листы прямо в мобильном приложении.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/eric-wus-newest-company-out-of-stealth-since-may-is-going-after-constructions-labor-crunch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>Why the global push to break free from Big Tech keeps falling short</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: разработать и продвигать HRmost и AIR как российские альтернативы западным HR-системам (Workday, SAP SuccessFactors) с акцентом на полное соответствие российскому трудовому законодательству, интеграцию с госсистемами (ЕИС, СБИС) и позиционирование как решение в условиях технологической независимости, особенно для крупных корпоративных клиентов и госсектора.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/google-amazon-cloud-china-india/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-26
+        · уверенность: средняя
+        
+      </p>
     </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Opaque recurrence, and other AI terms that you should probably know</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать образовательный модуль или AI-ассистента для HR-специалистов, который объясняет AI-термины в контексте рекрутинга и помогает понимать возможности AI-инструментов при подборе персонала, позиционируя Авито.Работу как thought leader в AI-driven рекрутменте.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/artificial-intelligence-definition-glossary-hallucinations-guide-to-common-ai-terms/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>A secret new Elizabeth Holmes documentary stuns Telluride</h3>
-      <p class="hyp">HR-tech (HRmost/AIR): Разработать продуктовую функцию верификации карьерной истории и квалификации кандидатов с использованием открытых данных и AI, позиционируя её как инструмент снижения репутационных рисков при найме топ-менеджеров и специалистов в высокорискованных отраслях.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/a-secret-new-elizabeth-holmes-documentary-stuns-telluride/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>What we expect from the upcoming Apple launch</h3>
-      <p class="hyp">Для HR-tech (AIR/HRmost): разработать оптимизированный UX для складных устройств в продуктах подбора и рекрутинга, позволяющий использовать увеличенную площадь экрана для одновременного просмотра резюме и коммуникации с кандидатами, ориентируясь на премиум-сегмент работодателей</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/07/what-we-expect-from-the-upcoming-apple-launch/" target="_blank" rel="noopener">ссылка</a> · 2026-09-07 · уверенность: низкая</p>
-    </article>
-    <article class="card red">
-      <div class="card-top">
-        <span class="pill red">2</span>
-        <span class="status">new</span>
-      </div>
-      <h3>Phil Schiller’s App Store exit reportedly driven by wariness over future plans</h3>
-      <p class="hyp">HR-tech: разработать веб-first или прогрессивное веб-приложение (PWA) для продуктов HRmost и AIR, снижающее зависимость от App Store и комиссий Apple, с возможностью прямой подписочной модели и большей гибкостью в монетизации для клиентов.</p>
-      <p class="meta">Источник: <a href="https://techcrunch.com/2026/09/06/phil-schillers-app-store-exit-reportedly-driven-by-wariness-over-future-plans/" target="_blank" rel="noopener">ссылка</a> · 2026-09-06 · уверенность: низкая</p>
-    </article></section><section class="market-panel" data-market="Подработка">
-    <article class="card green">
-      <div class="card-top">
-        <span class="pill green">4.0</span>
-        <span class="status">shortlisted</span>
-      </div>
-      <h3>Branch: Expanding Earned Wage Access - the new Flex model</h3>
-      <p class="hyp">Добавить мгновенный вывод заработанного (earned wage access) как встроенную функцию в Авито.Подработку через партнёрство с платёжным провайдером вместо самостоятельной разработки инфраструктуры.</p>
-      <p class="meta">Источник: <a href="https://branchapp.com/blog/flex-embedded-ewa" target="_blank" rel="noopener">ссылка</a> · 2026-07-14 · уверенность: Средняя-высокая — сигнал внутри целевого окна, тема подтверждается несколькими независимыми EWA-платформами по данным поиска, не только Branch.</p>
-    </article>
-    <article class="card yellow">
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-08-25">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Fintech is helping shift global payroll away from traditional processing</h3>
-      <p class="hyp">HR-tech: интеграция финтех-возможностей в HRmost/AIR — досрочный доступ к зарплате для работников через партнёрство с финтех-провайдерами, что усилит ценностное предложение для работодателей и повысит удержание пользователей платформы.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/fintech-is-helping-shift-global-payroll-away-from-traditional-processing/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=fintech-is-helping-shift-global-payroll-away-from-traditional-processing" target="_blank" rel="noopener">ссылка</a> · 2026-09-08 · уверенность: средняя</p>
+      <h3>America’s immigration policy is driving away future AI leaders</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): Разработать продукт для работодателей по оценке и быстрому онбордингу международных AI/ML-специалистов с учётом российского миграционного законодательства, включая автоматизацию визовой поддержки и верификации компетенций. Это позволит российским tech-компаниям эффективнее конкурировать за перераспределяющиеся глобальные таланты.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/us-immigration-rules-ai-talent-china/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-25
+        · уверенность: средняя
+        
+      </p>
     </article>
-    <article class="card yellow">
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-08-24">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>The UAE is fighting AI hackers with AI of its own</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: интегрировать AI-модуль кибербезопасности в HRmost и AIR для защиты персональных данных кандидатов и предотвращения мошенничества при найме (фейковые резюме, социальная инженерия). Позиционировать как конкурентное преимущество для enterprise-клиентов в регионах с высокими рисками утечек данных.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/uae-ai-cyberattacks-cyber-factory-defenses/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-24
+        · уверенность: низкая
+        
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-08-21">
       <div class="card-top">
         <span class="pill yellow">3</span>
-        <span class="status">new</span>
+        <span class="pill status">new</span>
       </div>
-      <h3>Gen X and millennials feel least positive after work, new research finds</h3>
-      <p class="hyp">Авито.Подработка: разработать функционал wellbeing-поддержки для сменных работников 30-55 лет — рекомендации по балансу смен, геймификация достижений, накопительные бонусы за стабильность, интеграция с программами финансового благополучия и обучения, что повысит удержание и частоту возвращения на платформу.</p>
-      <p class="meta">Источник: <a href="https://hrtechfeed.com/gen-x-and-millennials-feel-least-positive-after-work-new-research-finds/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=gen-x-and-millennials-feel-least-positive-after-work-new-research-finds" target="_blank" rel="noopener">ссылка</a> · 2026-09-04 · уверенность: средняя</p>
-    </article></section>
+      <h3>A dumpling shop becomes a poster child of AI adoption in China</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (AIR/HRmost): разработать инструменты аудита AI-готовности персонала и рекомендательные системы по переквалификации для работодателей в сегментах общепита, ритейла и сервисов, где автоматизация вытесняет рутинные функции; монетизация через подписку для малого бизнеса.</p>
+      <p class="meta">
+        <a href="https://restofworld.org/2026/china-ai-adoption-jinguyuan/?utm_source=rss&amp;utm_medium=rss&amp;utm_campaign=feeds" target="_blank" rel="noopener">источник</a>
+        · 2026-08-21
+        · уверенность: средняя
+        
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-06-16">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Christopher Golda and Grey Baker Join YC as General Partners</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Мониторить портфель YC на предмет появления новых HR-tech стартапов для возможных партнёрств, M&amp;A или заимствования лучших практик в продуктах HRmost и AIR, особенно в области AI-инструментов для рекрутинга.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/chris-golda-and-grey-baker-general-partners/" target="_blank" rel="noopener">источник</a>
+        · 2026-06-16
+        · уверенность: низкая
+        
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-06-11">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Diana Hu Is YC&#x27;s Newest Managing Partner</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech (HRmost/AIR): Усиление операторского фокуса в YC может означать рост качественных B2B HR-tech стартапов в их портфеле. Возможность для Авито.Работы - установить партнёрские отношения с YC для раннего доступа к перспективным HR-tech решениям для интеграции или M&amp;A, либо адаптации их практик масштабирования продуктов.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/diana-hu-managing-partner/" target="_blank" rel="noopener">источник</a>
+        · 2026-06-11
+        · уверенность: низкая
+        
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-04-06">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Harshita Arora Joins YC as General Partner</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: мониторить портфель YC на предмет перспективных B2B HR-инфраструктурных решений для потенциального партнёрства или M&amp;A, особенно в области автоматизации рекрутинга и fintech для выплат работникам, что может усилить позиции HRmost и AIR.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/welcome-harshita/" target="_blank" rel="noopener">источник</a>
+        · 2026-04-06
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2026-02-05">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Adding Canada Back to Our List of Accepted Countries of Incorporation</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): усиление присутствия канадских tech-компаний в экосистеме YC может увеличить спрос на инструменты удалённого найма и кросс-border рекрутинга. Можно протестировать партнёрство с YC-backed компаниями для пилотирования решений по международному подбору tech-талантов с фокусом на Канаду и страны СНГ.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/adding-canada-back/" target="_blank" rel="noopener">источник</a>
+        · 2026-02-05
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2026-01-23">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Congratulations to EquipmentShare on Going Public</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): разработка вертикального решения для управления временным персоналом и подрядчиками в строительстве — отрасли с высокой текучестью, сезонностью и потребностью в быстром масштабировании команд на проектах.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/congratulations-to-equipmentshare/" target="_blank" rel="noopener">источник</a>
+        · 2026-01-23
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="Не определено" data-color="yellow" data-score="3" data-date="2026-01-16">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Announcing the YC AI Stack</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для рынка HR-tech: создать партнёрскую программу с AI-стартапами из YC или аналогичных акселераторов для интеграции их решений в HRmost/AIR (скрининг резюме, автоматизация интервью, прогнозная аналитика), получая ранний доступ к инновациям до выхода конкурентов на российский рынок.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/the-yc-ai-student-starter-pack/" target="_blank" rel="noopener">источник</a>
+        · 2026-01-16
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-12-18">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>2026 Demo Day Dates</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost/AIR): отслеживать стартапы из батчей YC 2026 в сфере будущего труда и HR-tech для раннего партнёрства или интеграции инновационных решений (AI-рекрутинг, оценка кандидатов) в продуктовую линейку Авито.Работы.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/2026-demo-days/" target="_blank" rel="noopener">источник</a>
+        · 2025-12-18
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card yellow" data-market="HR-tech" data-color="yellow" data-score="3" data-date="2025-12-10">
+      <div class="card-top">
+        <span class="pill yellow">3</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Meesho Goes Public</h3>
+      <div class="badges"><span class="pill market">HR-tech</span></div>
+      <p class="hyp">Для Авито.Подработка: создать инструменты самозанятости/микробизнеса, позволяющие исполнителям масштабироваться от разовых заданий к постоянным клиентам через витрину услуг, рейтинги и управление заказами — превращая платформу из доски объявлений в enabler малого бизнеса в сфере услуг.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/meesho-goes-public/" target="_blank" rel="noopener">источник</a>
+        · 2025-12-10
+        · уверенность: средняя
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-11-12">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Congratulations to Groww</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Разработать для HRmost/AIR модуль финансового благополучия сотрудников, позволяющий работодателям предлагать упрощённый доступ к инвестиционным инструментам (аналог Employee Stock Purchase Plans, но шире) как часть компенсационного пакета, увеличивая ценность HR-платформы и создавая новый revenue stream через партнёрства с финансовыми институтами.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/groww/" target="_blank" rel="noopener">источник</a>
+        · 2025-11-12
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-11-06">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>BillionToOne Goes Public — The Startup That Made Genetic Testing Universal</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Разработать платформу обязательных/compliance медицинских проверок для работодателей (pre-employment screening, периодические осмотры) с интеграцией лабораторий и автоматизацией документооборота — монетизация через subscription работодателей и комиссию с лабораторий, встраивается в существующий поток найма через HRmost/AIR.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/billiontoone/" target="_blank" rel="noopener">источник</a>
+        · 2025-11-06
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-10-14">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Meet YC&#x27;s Newest Visiting Partners</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: установить партнёрские отношения с YC для раннего доступа к портфельным стартапам в области HR-технологий, рассмотреть возможность интеграции или M&amp;A перспективных решений для усиления продуктовой линейки HRmost и AIR.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/ycs-newest-visiting-partners/" target="_blank" rel="noopener">источник</a>
+        · 2025-10-14
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-09-23">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>YC x Coinbase RFS: Build Onchain</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для Авито.Подработка: интеграция криптовыплат для исполнителей задач и международных фрилансеров может снизить транзакционные издержки платформы на 30-50% и открыть доступ к глобальному пулу исполнителей, особенно в сегментах удаленной и краткосрочной занятости, где скорость расчетов критична.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/build-onchain/" target="_blank" rel="noopener">источник</a>
+        · 2025-09-23
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-09-12">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Ankit Gupta Joins YC as General Partner, Bringing Deep ML Expertise</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">Для HR-tech (HRmost и AIR): ускорить развитие ML-компонентов в продуктах (матчинг кандидатов, предиктивная аналитика, автоматизация скрининга) до того, как YC-backed конкуренты займут рынок, возможно через партнерства с ML-экспертами или M&amp;A небольших AI-стартапов.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/welcome-ankit/" target="_blank" rel="noopener">источник</a>
+        · 2025-09-12
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-06-12">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Dalton Caldwell’s Move to Partner Emeritus</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Возможная смена фокуса YC создаёт окно для усиления партнёрских отношений с YC-портфелем в сегменте HR-tech — можно предложить HRmost и AIR как решения для быстрорастущих стартапов из новых батчей, где могут измениться приоритеты менторинга.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/dalton-caldwell-partner-emeritus/" target="_blank" rel="noopener">источник</a>
+        · 2025-06-12
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article>
+    <article class="card red" data-market="Не определено" data-color="red" data-score="2" data-date="2025-05-21">
+      <div class="card-top">
+        <span class="pill red">2</span>
+        <span class="pill status">new</span>
+      </div>
+      <h3>Welcoming Jon Xu and Andrew Miklas as YC’s Newest General Partners</h3>
+      <div class="badges"><span class="pill market">Не определено</span></div>
+      <p class="hyp">HR-tech: Разработать продукт для отслеживания и привлечения талантов из акселераторов и венчурных экосистем. AIR/HRmost могут предложить компаниям из YC и других акселераторов специализированные инструменты для найма ранних сотрудников с пониманием стартап-специфики, создав прямой канал доступа к высококвалифицированным кандидатам.</p>
+      <p class="meta">
+        <a href="https://www.ycombinator.com/blog/welcome-jon-and-andrew/" target="_blank" rel="noopener">источник</a>
+        · 2025-05-21
+        · уверенность: низкая
+        <span class="flag">вне целевого окна</span>
+      </p>
+    </article></div>
+
 <script>
-  const tabs = document.querySelectorAll('.tab');
-  const panels = document.querySelectorAll('.market-panel');
-  function show(market) {
-    tabs.forEach(t => t.classList.toggle('active', t.dataset.market === market));
-    panels.forEach(p => p.classList.toggle('active', p.dataset.market === market));
+  const state = { market: 'Все', color: 'Все', sort: 'score' };
+  const grid = document.getElementById('grid');
+  const cards = () => Array.from(grid.querySelectorAll('.card'));
+
+  function apply() {
+    let visible = 0;
+    cards().forEach(c => {
+      const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
+      const matchColor = state.color === 'Все' || c.dataset.color === state.color;
+      const show = matchMarket && matchColor;
+      c.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+    let empty = grid.querySelector('.empty');
+    if (visible === 0 && !empty) {
+      empty = document.createElement('p');
+      empty.className = 'empty';
+      empty.textContent = 'Нет сигналов под текущий фильтр';
+      grid.appendChild(empty);
+    } else if (visible > 0 && empty) {
+      empty.remove();
+    }
   }
-  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.market)));
-  show('Все');
+
+  function sortCards() {
+    const sorted = cards().sort((a, b) => {
+      if (state.sort === 'score') return (parseFloat(b.dataset.score) || -1) - (parseFloat(a.dataset.score) || -1);
+      return (b.dataset.date || '').localeCompare(a.dataset.date || '');
+    });
+    sorted.forEach(c => grid.appendChild(c));
+  }
+
+  document.getElementById('tabs').addEventListener('click', e => {
+    if (!e.target.classList.contains('tab')) return;
+    state.market = e.target.dataset.market;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === e.target));
+    apply();
+  });
+
+  document.getElementById('stats').addEventListener('click', e => {
+    const btn = e.target.closest('.stat');
+    if (!btn) return;
+    state.color = btn.dataset.color;
+    document.querySelectorAll('.stat').forEach(s => s.classList.toggle('active', s === btn));
+    apply();
+  });
+
+  document.getElementById('sort').addEventListener('click', e => {
+    if (!e.target.classList.contains('sortbtn')) return;
+    state.sort = e.target.dataset.sort;
+    document.querySelectorAll('.sortbtn').forEach(b => b.classList.toggle('active', b === e.target));
+    sortCards();
+  });
+
+  sortCards();
+  apply();
 </script>
 </body>
 </html>
