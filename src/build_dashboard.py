@@ -322,15 +322,48 @@ TEMPLATE = """<!doctype html>
   window.SIGNALS = {signals_json};
   window.CRITERIA_LABELS = {criteria_labels_json};
 </script>
+{firebase_scripts}
 <script>
   const state = {{ market: 'Все', color: 'Все', tier: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '' }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
 
-  // ---- Отмели / вернуть в цвет: состояние хранится в localStorage этого
-  // браузера (сайт статический, без сервера) — значит, отметка "Отмели"
-  // видна только на этом устройстве/браузере, не синхронизируется между
-  // коллегами и не переживёт очистку данных сайта.
+  // ---- Отмели / вернуть в цвет ----
+  // Если в config/parameters.yaml -> dashboard.firebase заполнены ключи —
+  // состояние "Отмели" общее для всех, хранится в Firestore и обновляется
+  // у всех открытых вкладок практически сразу (см. README). Если нет —
+  // используется localStorage этого браузера как раньше: отметка видна
+  // только на этом устройстве, не синхронизируется между коллегами.
+  const FIREBASE_CONFIG = {firebase_config_json};
+  const FIREBASE_ENABLED = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey);
+  let db = null;
+  if (FIREBASE_ENABLED) {{
+    try {{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      db = firebase.firestore();
+    }} catch (e) {{
+      console.error('Firebase не инициализировался — "Отмели" будет работать только локально в этом браузере:', e);
+      db = null;
+    }}
+  }}
+
+  // Стабильный короткий id карточки для Firestore (id документа не может
+  // содержать "/", а в data-key есть ссылка на источник) — простой
+  // детерминированный хэш, не криптографический, но коллизии между
+  // разными сигналами в масштабе одного бэклога практически исключены.
+  function hashKey(str) {{
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (let i = 0; i < str.length; i++) {{
+      const ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }}
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+  }}
+  cards().forEach(c => {{ c.dataset.fid = hashKey(c.dataset.key); }});
+
   const SHELF_KEY = 'avitoShelvedIdeas';
   let shelved = new Set();
   try {{
@@ -373,23 +406,34 @@ TEMPLATE = """<!doctype html>
     const shelveBtn = e.target.closest('.shelve-btn');
     if (shelveBtn) {{
       const card = shelveBtn.closest('.card');
-      shelved.add(card.dataset.key);
-      persistShelved();
-      card.classList.add('shelved');
-      setCardColor(card, 'grey');
-      recomputeStats();
-      apply();
+      if (db) {{
+        db.collection('shelved_ideas').doc(card.dataset.fid).set({{
+          shelved: true, key: card.dataset.key, updated: firebase.firestore.FieldValue.serverTimestamp(),
+        }}).catch(err => console.error('Не удалось записать "Отмели" в Firestore:', err));
+      }} else {{
+        shelved.add(card.dataset.key);
+        persistShelved();
+        card.classList.add('shelved');
+        setCardColor(card, 'grey');
+        recomputeStats();
+        apply();
+      }}
       return;
     }}
     const restoreBtn = e.target.closest('.restore-btn');
     if (restoreBtn) {{
       const card = restoreBtn.closest('.card');
-      shelved.delete(card.dataset.key);
-      persistShelved();
-      card.classList.remove('shelved');
-      setCardColor(card, card.dataset.origColor);
-      recomputeStats();
-      apply();
+      if (db) {{
+        db.collection('shelved_ideas').doc(card.dataset.fid).delete()
+          .catch(err => console.error('Не удалось убрать "Отмели" в Firestore:', err));
+      }} else {{
+        shelved.delete(card.dataset.key);
+        persistShelved();
+        card.classList.remove('shelved');
+        setCardColor(card, card.dataset.origColor);
+        recomputeStats();
+        apply();
+      }}
     }}
   }});
 
@@ -511,10 +555,37 @@ TEMPLATE = """<!doctype html>
     refreshBtn.addEventListener('click', e => e.preventDefault());
   }}
 
-  hydrateShelved();
-  recomputeStats();
   sortCards();
+  recomputeStats();
   apply();
+
+  if (db) {{
+    try {{
+      db.collection('shelved_ideas').onSnapshot(snap => {{
+        const ids = new Set();
+        snap.forEach(doc => ids.add(doc.id));
+        cards().forEach(c => {{
+          const isShelved = ids.has(c.dataset.fid);
+          c.classList.toggle('shelved', isShelved);
+          setCardColor(c, isShelved ? 'grey' : c.dataset.origColor);
+        }});
+        recomputeStats();
+        apply();
+      }}, err => {{
+        console.error('Firestore недоступен — "Отмели" работает только локально в этом браузере:', err);
+      }});
+    }} catch (e) {{
+      console.error('Не удалось подписаться на Firestore:', e);
+      db = null;
+      hydrateShelved();
+      recomputeStats();
+      apply();
+    }}
+  }} else {{
+    hydrateShelved();
+    recomputeStats();
+    apply();
+  }}
 
   // ---- Помощник по дашборду: локальная логика, без внешних вызовов ----
   const panel = document.getElementById('assistantPanel');
@@ -817,6 +888,25 @@ def build():
     signals_json = build_signals_json(rows, colors)
     criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
 
+    firebase_cfg = dash_cfg.get("firebase", {}) or {}
+    firebase_enabled = bool(str(firebase_cfg.get("api_key", "")).strip())
+    if firebase_enabled:
+        firebase_scripts_html = (
+            '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>\n'
+            '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>'
+        )
+        firebase_config_json = json.dumps({
+            "apiKey": firebase_cfg.get("api_key", ""),
+            "authDomain": firebase_cfg.get("auth_domain", ""),
+            "projectId": firebase_cfg.get("project_id", ""),
+            "storageBucket": firebase_cfg.get("storage_bucket", ""),
+            "messagingSenderId": firebase_cfg.get("messaging_sender_id", ""),
+            "appId": firebase_cfg.get("app_id", ""),
+        }, ensure_ascii=False)
+    else:
+        firebase_scripts_html = ""
+        firebase_config_json = "null"
+
     repo = str(dash_cfg.get("github_repo", "")).strip()
     if repo:
         refresh_href = f"https://github.com/{html.escape(repo)}/actions/workflows/weekly_signal_scan.yml"
@@ -847,6 +937,8 @@ def build():
             refresh_href=refresh_href,
             refresh_disabled_class=refresh_disabled_class,
             refresh_note=refresh_note,
+            firebase_scripts=firebase_scripts_html,
+            firebase_config_json=firebase_config_json,
         ),
         encoding="utf-8",
     )
