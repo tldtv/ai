@@ -68,7 +68,7 @@ sources:
     tier: 2
     type: rss
     url: "https://techcrunch.com/feed/"
-   - name: "Crunchbase News"
+  - name: "Crunchbase News"
     tier: 1
     type: rss
     url: "https://news.crunchbase.com/feed/"
