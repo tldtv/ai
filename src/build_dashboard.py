@@ -1,12 +1,14 @@
 """
 build_dashboard.py — читает data/backlog.csv и собирает docs/index.html:
-дашборд со сводной статистикой, вкладками по рынкам, фильтром по тиру
-источника (с подсказкой, какие источники в каком тире — берётся из
-config/parameters.yaml -> sources, отдельно вести не нужно), светофором
-(красный/жёлтый/зелёный) по полю priority_score, сортировкой и
-разбивкой оценки по критериям на каждой карточке. Пороги светофора и
-визуальные настройки — из config/parameters.yaml -> dashboard /
-traffic_light_thresholds.
+дашборд со сводной статистикой (светофор + статус «Отмели»), вкладками по
+рынкам с подсказкой о каждом рынке, фильтром по тиру источника (с
+подсказкой, какие источники в каком тире), фильтрами по диапазону оценки
+и по диапазону даты источника, сортировкой, разбивкой оценки по критериям
+с подсказками на каждой карточке, кнопкой «Отмели»/«Вернуть в цвет» и
+кнопкой перехода к ручному запуску обновления в GitHub Actions.
+
+Пороги светофора и визуальные настройки — из config/parameters.yaml ->
+dashboard / traffic_light_thresholds / markets / sources.
 
 docs/index.html обслуживается GitHub Pages (Settings -> Pages -> Deploy
 from a branch -> main -> /docs), поэтому после каждого пуша страница по
@@ -51,6 +53,25 @@ CRITERIA_DESCRIPTIONS = {
     "regulatory_risk": "Насколько низки регуляторные и юридические риски запуска — чем выше оценка, тем меньше риск",
 }
 
+# Пояснения к рынкам для тултипа/попапа у фильтра "Рынок" — используются,
+# если в config/parameters.yaml -> markets -> <рынок> нет своего поля
+# description.
+DEFAULT_MARKET_DESCRIPTIONS = {
+    "Классифайд": "Классифайд/джоборды — размещение вакансий как объявлений, без транзакционной модели внутри платформы.",
+    "Подработка": "Авито.Подработка — транзакционная платформенная занятость: смены и гиг-задачи, сделка происходит внутри платформы.",
+    "HR-tech": "HR-tech — продукты HRmost и AIR: инструменты автоматизации найма и рекрутинга для бизнеса.",
+}
+
+# Названия и метки светофора. "grey" — не только сигналы без валидной
+# оценки, но и основной смысл цвета: идеи, вручную отправленные в "Отмели".
+STAT_META = [
+    ("total", "Все", "Всего идей", "", "total"),
+    ("green", "green", "Топ идея", "🟢", "green"),
+    ("yellow", "yellow", "Внимательно изучить", "🟡", "yellow"),
+    ("red", "red", "Посмотреть в полглаза", "🔴", "red"),
+    ("grey", "grey", "Отмели", "⚪", "grey"),
+]
+
 TEMPLATE = """<!doctype html>
 <html lang="ru">
 <head>
@@ -69,12 +90,37 @@ TEMPLATE = """<!doctype html>
     --green: #2f9e59;    --green-soft: #e4f5ea; --green-ink: #1f6b3d;
     --yellow: #c98a1f;   --yellow-soft: #fbeed7; --yellow-ink: #8a5a12;
     --red: #c0392b;      --red-soft: #fbe1de;    --red-ink: #96291b;
-    --grey: #a3a3a3;     --grey-soft: #eee;      --grey-ink: #777;
+    --grey: #8a8f96;     --grey-soft: #eceded;   --grey-ink: #5c6066;
   }}
   *{{box-sizing:border-box;}}
   body{{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}}
-  h1{{font-size:22px;margin:0 0 4px;}}
+  h1{{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}}
   .sub{{color:var(--ink-soft);font-size:13px;margin:0 0 22px;}}
+
+  [data-tip]{{position:relative;cursor:help;}}
+  [data-tip]:hover::after, [data-tip]:focus::after{{
+    content:attr(data-tip);
+    position:absolute;
+    left:0;
+    top:100%;
+    margin-top:6px;
+    background:var(--ink);
+    color:#fff;
+    padding:7px 10px;
+    border-radius:7px;
+    font-size:11px;
+    line-height:1.45;
+    width:220px;
+    max-width:70vw;
+    white-space:normal;
+    z-index:8;
+    box-shadow:0 6px 16px rgba(0,0,0,.18);
+  }}
+  .crit-name{{border-bottom:1px dotted var(--ink-soft);}}
+
+  .refresh-btn{{font:inherit;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);cursor:pointer;text-decoration:none;white-space:nowrap;}}
+  .refresh-btn.disabled{{opacity:.55;cursor:not-allowed;border-color:var(--border);background:var(--grey-soft);color:var(--grey-ink);}}
+  .refresh-wrap{{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}}
 
   .stats{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;}}
   .stat{{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;border-left:4px solid var(--grey);}}
@@ -84,10 +130,11 @@ TEMPLATE = """<!doctype html>
   .stat.green{{border-left-color:var(--green);}}
   .stat.yellow{{border-left-color:var(--yellow);}}
   .stat.red{{border-left-color:var(--red);}}
+  .stat.grey{{border-left-color:var(--grey);}}
   .stat.active{{outline:2px solid var(--accent);outline-offset:-1px;}}
 
-  .toolbar{{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px 20px;margin-bottom:18px;}}
-  .filters{{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;}}
+  .toolbar{{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px 24px;margin-bottom:18px;}}
+  .filters{{display:flex;flex-wrap:wrap;gap:16px 26px;align-items:center;}}
   .filter-group{{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}}
   .filter-label{{font-size:12px;color:var(--ink-soft);margin-right:2px;}}
   .tabs, .sort{{display:flex;gap:8px;flex-wrap:wrap;}}
@@ -102,11 +149,28 @@ TEMPLATE = """<!doctype html>
   .tier-pop p{{margin:0 0 6px;}}
   .tier-pop p:last-child{{margin-bottom:0;}}
 
+  .date-range, .score-range{{display:flex;align-items:center;gap:6px;}}
+  .date-range input[type=date]{{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}}
+  .date-range span{{color:var(--ink-soft);font-size:12px;}}
+
+  .score-range{{gap:10px;}}
+  .range-slider{{position:relative;height:26px;width:130px;}}
+  .range-slider input[type=range]{{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);-webkit-appearance:none;appearance:none;width:100%;height:0;background:transparent;pointer-events:none;margin:0;}}
+  .range-slider input[type=range]::-webkit-slider-thumb{{-webkit-appearance:none;pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 1px var(--accent);cursor:pointer;margin-top:0;}}
+  .range-slider input[type=range]::-moz-range-thumb{{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 1px var(--accent);cursor:pointer;}}
+  .range-slider input[type=range]::-webkit-slider-runnable-track{{background:transparent;}}
+  .range-slider input[type=range]::-moz-range-track{{background:transparent;}}
+  .range-track{{position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);background:var(--border);border-radius:2px;}}
+  .range-fill{{position:absolute;top:50%;height:4px;transform:translateY(-50%);background:var(--accent);border-radius:2px;}}
+  .range-values{{font-size:12px;color:var(--ink-soft);white-space:nowrap;}}
+
   .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}}
-  .card{{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--grey);border-radius:10px;padding:14px;}}
+  .card{{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--grey);border-radius:10px;padding:14px;transition:opacity .15s ease;}}
   .card.green{{border-left-color:var(--green);}}
   .card.yellow{{border-left-color:var(--yellow);}}
   .card.red{{border-left-color:var(--red);}}
+  .card.grey{{border-left-color:var(--grey);}}
+  .card.shelved{{opacity:.65;}}
   .card.hidden{{display:none;}}
   .card-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;}}
   .badges{{display:flex;gap:6px;flex-wrap:wrap;}}
@@ -115,6 +179,7 @@ TEMPLATE = """<!doctype html>
   .pill.green{{background:var(--green-soft);color:var(--green-ink);}}
   .pill.yellow{{background:var(--yellow-soft);color:var(--yellow-ink);}}
   .pill.red{{background:var(--red-soft);color:var(--red-ink);}}
+  .pill.grey{{background:var(--grey-soft);color:var(--grey-ink);}}
   .pill.market{{background:var(--accent-soft);color:var(--accent);}}
   .pill.status{{background:var(--grey-soft);color:var(--grey-ink);}}
   .hyp{{font-size:13px;color:#444;margin:0 0 8px;}}
@@ -129,28 +194,15 @@ TEMPLATE = """<!doctype html>
   .breakdown summary::before{{content:"▸ ";}}
   .breakdown[open] summary::before{{content:"▾ ";}}
   .breakdown ul{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}}
-  .breakdown li{{position:relative;display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
+  .breakdown li{{display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
   .breakdown li:first-child{{border-top:none;}}
   .breakdown .val{{font-weight:700;color:var(--ink);}}
-  .crit-name{{cursor:help;border-bottom:1px dotted var(--ink-soft);}}
-  .crit-name:hover::after, .crit-name:focus::after{{
-    content:attr(data-tip);
-    position:absolute;
-    left:0;
-    bottom:100%;
-    margin-bottom:6px;
-    background:var(--ink);
-    color:#fff;
-    padding:7px 10px;
-    border-radius:7px;
-    font-size:11px;
-    line-height:1.45;
-    width:220px;
-    max-width:70vw;
-    white-space:normal;
-    z-index:6;
-    box-shadow:0 6px 16px rgba(0,0,0,.18);
-  }}
+
+  .card-actions{{margin-top:10px;display:flex;gap:8px;}}
+  .shelve-btn, .restore-btn{{font:inherit;font-size:11.5px;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
+  .shelve-btn:hover, .restore-btn:hover{{border-color:var(--accent);color:var(--accent);}}
+  .card:not(.shelved) .restore-btn{{display:none;}}
+  .card.shelved .shelve-btn{{display:none;}}
 
   .assistant-toggle{{position:fixed;right:20px;bottom:20px;z-index:20;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:12px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;}}
   .assistant-panel{{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .22s ease;z-index:30;display:flex;flex-direction:column;}}
@@ -171,21 +223,29 @@ TEMPLATE = """<!doctype html>
 </style>
 </head>
 <body>
-  <h1>{title}</h1>
-  <p class="sub">Бэклог сигналов · авто-обновление по расписанию · пороги и цвет — из config/parameters.yaml</p>
+  <h1>{title}
+    <span class="refresh-wrap">
+      <a class="refresh-btn{refresh_disabled_class}" id="refreshBtn" href="{refresh_href}" target="_blank" rel="noopener">↻ Обновить</a>
+      <span>{refresh_note}</span>
+    </span>
+  </h1>
+  <p class="sub">Бэклог сигналов · </p>
 
   <div class="stats" id="stats">
     <button class="stat total active" data-color="Все">
       <span class="n">{total}</span><span class="l">Всего идей</span>
     </button>
     <button class="stat green" data-color="green">
-      <span class="n">{green_count}</span><span class="l">🟢 Зелёных</span>
+      <span class="n" id="statGreen">{green_count}</span><span class="l">🟢 Топ идея</span>
     </button>
     <button class="stat yellow" data-color="yellow">
-      <span class="n">{yellow_count}</span><span class="l">🟡 Жёлтых</span>
+      <span class="n" id="statYellow">{yellow_count}</span><span class="l">🟡 Внимательно изучить</span>
     </button>
     <button class="stat red" data-color="red">
-      <span class="n">{red_count}</span><span class="l">🔴 Красных</span>
+      <span class="n" id="statRed">{red_count}</span><span class="l">🔴 Посмотреть в полглаза</span>
+    </button>
+    <button class="stat grey" data-color="grey">
+      <span class="n" id="statGrey">{grey_count}</span><span class="l">⚪ Отмели</span>
     </button>
   </div>
 
@@ -194,6 +254,10 @@ TEMPLATE = """<!doctype html>
       <div class="filter-group">
         <span class="filter-label">Рынок:</span>
         <div class="tabs" id="tabs">{tabs}</div>
+        <div class="tier-info">
+          <button class="info-btn" id="marketInfoBtn" type="button" aria-expanded="false" aria-label="Что означает каждый рынок">i</button>
+          <div class="tier-pop" id="marketPop" hidden>{market_pop}</div>
+        </div>
       </div>
       <div class="filter-group">
         <span class="filter-label">Tier:</span>
@@ -201,6 +265,26 @@ TEMPLATE = """<!doctype html>
         <div class="tier-info">
           <button class="info-btn" id="tierInfoBtn" type="button" aria-expanded="false" aria-label="Что входит в каждый tier">i</button>
           <div class="tier-pop" id="tierPop" hidden>{tier_pop}</div>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Оценка:</span>
+        <div class="score-range">
+          <div class="range-slider" id="scoreSlider">
+            <div class="range-track"></div>
+            <div class="range-fill" id="scoreFill"></div>
+            <input type="range" id="scoreMinRange" min="0" max="5" step="0.1" value="0" aria-label="Минимальная оценка">
+            <input type="range" id="scoreMaxRange" min="0" max="5" step="0.1" value="5" aria-label="Максимальная оценка">
+          </div>
+          <span class="range-values" id="scoreValues">0 – 5</span>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Дата:</span>
+        <div class="date-range">
+          <input type="date" id="dateFrom" aria-label="С даты">
+          <span>—</span>
+          <input type="date" id="dateTo" aria-label="По дату">
         </div>
       </div>
     </div>
@@ -239,9 +323,75 @@ TEMPLATE = """<!doctype html>
   window.CRITERIA_LABELS = {criteria_labels_json};
 </script>
 <script>
-  const state = {{ market: 'Все', color: 'Все', tier: 'Все', sort: 'score' }};
+  const state = {{ market: 'Все', color: 'Все', tier: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '' }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
+
+  // ---- Отмели / вернуть в цвет: состояние хранится в localStorage этого
+  // браузера (сайт статический, без сервера) — значит, отметка "Отмели"
+  // видна только на этом устройстве/браузере, не синхронизируется между
+  // коллегами и не переживёт очистку данных сайта.
+  const SHELF_KEY = 'avitoShelvedIdeas';
+  let shelved = new Set();
+  try {{
+    shelved = new Set(JSON.parse(localStorage.getItem(SHELF_KEY) || '[]'));
+  }} catch (e) {{ /* localStorage недоступен (приватный режим и т.п.) — просто не сохраняем между визитами */ }}
+  function persistShelved() {{
+    try {{ localStorage.setItem(SHELF_KEY, JSON.stringify([...shelved])); }} catch (e) {{}}
+  }}
+
+  function setCardColor(card, color) {{
+    card.classList.remove('green', 'yellow', 'red', 'grey');
+    card.classList.add(color);
+    card.dataset.color = color;
+    const scorePill = card.querySelector('.card-top .pill:first-child');
+    if (scorePill) {{
+      scorePill.classList.remove('green', 'yellow', 'red', 'grey');
+      scorePill.classList.add(color);
+    }}
+  }}
+
+  function hydrateShelved() {{
+    cards().forEach(c => {{
+      if (shelved.has(c.dataset.key)) {{
+        c.classList.add('shelved');
+        setCardColor(c, 'grey');
+      }}
+    }});
+  }}
+
+  function recomputeStats() {{
+    const counts = {{ green: 0, yellow: 0, red: 0, grey: 0 }};
+    cards().forEach(c => {{ counts[c.dataset.color] = (counts[c.dataset.color] || 0) + 1; }});
+    document.getElementById('statGreen').textContent = counts.green;
+    document.getElementById('statYellow').textContent = counts.yellow;
+    document.getElementById('statRed').textContent = counts.red;
+    document.getElementById('statGrey').textContent = counts.grey;
+  }}
+
+  grid.addEventListener('click', e => {{
+    const shelveBtn = e.target.closest('.shelve-btn');
+    if (shelveBtn) {{
+      const card = shelveBtn.closest('.card');
+      shelved.add(card.dataset.key);
+      persistShelved();
+      card.classList.add('shelved');
+      setCardColor(card, 'grey');
+      recomputeStats();
+      apply();
+      return;
+    }}
+    const restoreBtn = e.target.closest('.restore-btn');
+    if (restoreBtn) {{
+      const card = restoreBtn.closest('.card');
+      shelved.delete(card.dataset.key);
+      persistShelved();
+      card.classList.remove('shelved');
+      setCardColor(card, card.dataset.origColor);
+      recomputeStats();
+      apply();
+    }}
+  }});
 
   function apply() {{
     let visible = 0;
@@ -249,7 +399,11 @@ TEMPLATE = """<!doctype html>
       const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
       const matchColor = state.color === 'Все' || c.dataset.color === state.color;
       const matchTier = state.tier === 'Все' || c.dataset.tier === state.tier;
-      const show = matchMarket && matchColor && matchTier;
+      const score = parseFloat(c.dataset.score);
+      const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
+      const d = c.dataset.date || '';
+      const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
+      const show = matchMarket && matchColor && matchTier && matchScore && matchDate;
       c.classList.toggle('hidden', !show);
       if (show) visible++;
     }});
@@ -301,18 +455,64 @@ TEMPLATE = """<!doctype html>
     sortCards();
   }});
 
+  function togglePop(btn, pop) {{
+    btn.addEventListener('click', e => {{
+      e.stopPropagation();
+      const open = pop.hasAttribute('hidden');
+      if (open) pop.removeAttribute('hidden'); else pop.setAttribute('hidden', '');
+      btn.setAttribute('aria-expanded', String(open));
+    }});
+  }}
   const tierInfoBtn = document.getElementById('tierInfoBtn');
   const tierPop = document.getElementById('tierPop');
-  tierInfoBtn.addEventListener('click', e => {{
-    e.stopPropagation();
-    const open = tierPop.hasAttribute('hidden');
-    if (open) tierPop.removeAttribute('hidden'); else tierPop.setAttribute('hidden', '');
-    tierInfoBtn.setAttribute('aria-expanded', String(open));
-  }});
+  const marketInfoBtn = document.getElementById('marketInfoBtn');
+  const marketPop = document.getElementById('marketPop');
+  togglePop(tierInfoBtn, tierPop);
+  togglePop(marketInfoBtn, marketPop);
   document.addEventListener('click', e => {{
     if (!tierPop.contains(e.target) && e.target !== tierInfoBtn) tierPop.setAttribute('hidden', '');
+    if (!marketPop.contains(e.target) && e.target !== marketInfoBtn) marketPop.setAttribute('hidden', '');
   }});
 
+  // ---- Диапазон оценки: два перекрывающихся range-инпута ----
+  const scoreMinRange = document.getElementById('scoreMinRange');
+  const scoreMaxRange = document.getElementById('scoreMaxRange');
+  const scoreFill = document.getElementById('scoreFill');
+  const scoreValues = document.getElementById('scoreValues');
+  function updateScoreUI() {{
+    let lo = parseFloat(scoreMinRange.value);
+    let hi = parseFloat(scoreMaxRange.value);
+    if (lo > hi) {{ [lo, hi] = [hi, lo]; }}
+    state.scoreMin = lo;
+    state.scoreMax = hi;
+    const pct = v => (v / 5) * 100;
+    scoreFill.style.left = pct(lo) + '%';
+    scoreFill.style.width = (pct(hi) - pct(lo)) + '%';
+    scoreValues.textContent = lo.toFixed(1) + ' – ' + hi.toFixed(1);
+  }}
+  scoreMinRange.addEventListener('input', () => {{
+    if (parseFloat(scoreMinRange.value) > parseFloat(scoreMaxRange.value)) scoreMinRange.value = scoreMaxRange.value;
+    updateScoreUI(); apply();
+  }});
+  scoreMaxRange.addEventListener('input', () => {{
+    if (parseFloat(scoreMaxRange.value) < parseFloat(scoreMinRange.value)) scoreMaxRange.value = scoreMinRange.value;
+    updateScoreUI(); apply();
+  }});
+  updateScoreUI();
+
+  // ---- Диапазон даты источника ----
+  const dateFrom = document.getElementById('dateFrom');
+  const dateTo = document.getElementById('dateTo');
+  dateFrom.addEventListener('change', () => {{ state.dateFrom = dateFrom.value; apply(); }});
+  dateTo.addEventListener('change', () => {{ state.dateTo = dateTo.value; apply(); }});
+
+  const refreshBtn = document.getElementById('refreshBtn');
+  if (refreshBtn.classList.contains('disabled')) {{
+    refreshBtn.addEventListener('click', e => e.preventDefault());
+  }}
+
+  hydrateShelved();
+  recomputeStats();
   sortCards();
   apply();
 
@@ -362,15 +562,15 @@ TEMPLATE = """<!doctype html>
 
     if (/сколько.*(зел[её]н)/.test(q)) {{
       const n = rows.filter(r => r.color === 'green').length;
-      return `Зелёных идей: ${{n}} из ${{rows.length}}.`;
+      return `Зелёных идей (топ): ${{n}} из ${{rows.length}}.`;
     }}
     if (/сколько.*(жёлт|желт)/.test(q)) {{
       const n = rows.filter(r => r.color === 'yellow').length;
-      return `Жёлтых идей: ${{n}} из ${{rows.length}}.`;
+      return `Жёлтых идей (внимательно изучить): ${{n}} из ${{rows.length}}.`;
     }}
     if (/сколько.*красн/.test(q)) {{
       const n = rows.filter(r => r.color === 'red').length;
-      return `Красных идей: ${{n}} из ${{rows.length}}.`;
+      return `Красных идей (посмотреть в полглаза): ${{n}} из ${{rows.length}}.`;
     }}
 
     if (/(топ|лучш|самая высок|самый приоритет|максимальн)/.test(q)) {{
@@ -484,7 +684,7 @@ def render_breakdown(row):
     return f'<details class="breakdown"><summary>Разбивка оценки</summary><ul>{items}</ul></details>'
 
 
-def render_card(row, color):
+def render_card(row, color, tier_lookup, market_descriptions):
     market = row.get("market_guess", "") or "Не определено"
     cluster = row.get("cluster_id", "")
     status = row.get("status", "") or "new"
@@ -494,14 +694,19 @@ def render_card(row, color):
     in_window = str(row.get("in_target_window", "")).strip().lower()
     window_flag = '<span class="flag">вне целевого окна</span>' if in_window in ("false", "0", "нет") else ""
 
-    badges = f'<span class="pill market">{html.escape(market)}</span>'
+    market_tip = html.escape(market_descriptions.get(market, ""))
+    badges = f'<span class="pill market" tabindex="0" data-tip="{market_tip}">{html.escape(market)}</span>'
     if tier:
-        badges += f'<span class="pill">tier {html.escape(tier)}</span>'
+        tier_sources = tier_lookup.get(tier, [])
+        tier_tip = html.escape(("Источники tier " + tier + ": " + ", ".join(tier_sources)) if tier_sources else "")
+        badges += f'<span class="pill" tabindex="0" data-tip="{tier_tip}">tier {html.escape(tier)}</span>'
     if cluster:
         badges += f'<span class="pill">кластер {html.escape(cluster)}</span>'
 
+    key = html.escape((row.get("source_url", "").strip() or row.get("title", "")) + "|" + row.get("title", ""))
+
     return f"""
-    <article class="card {color}" data-market="{html.escape(market)}" data-color="{color}" data-tier="{html.escape(tier)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
+    <article class="card {color}" data-key="{key}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-tier="{html.escape(tier)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
       <div class="card-top">
         <span class="pill {color}">{html.escape(str(score))}</span>
         <span class="pill status">{html.escape(status)}</span>
@@ -516,6 +721,10 @@ def render_card(row, color):
         {window_flag}
       </p>
       {render_breakdown(row)}
+      <div class="card-actions">
+        <button class="shelve-btn" type="button">Отмели</button>
+        <button class="restore-btn" type="button">Вернуть в цвет</button>
+      </div>
     </article>"""
 
 
@@ -561,12 +770,20 @@ def build_tier_lookup(cfg):
     return dict(sorted(by_tier.items()))
 
 
+def market_description(name, markets_cfg):
+    cfg_desc = (markets_cfg.get(name) or {}).get("description")
+    if cfg_desc:
+        return cfg_desc
+    return DEFAULT_MARKET_DESCRIPTIONS.get(name, "")
+
+
 def build():
     cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     thresholds = cfg["traffic_light_thresholds"]
     dash_cfg = cfg.get("dashboard", {})
     title = dash_cfg.get("title", DEFAULT_TITLE)
     accent = dash_cfg.get("accent_color", DEFAULT_ACCENT)
+    markets_cfg = cfg.get("markets", {})
 
     rows = load_rows()
     colors = [traffic_light(r.get("priority_score"), thresholds) for r in rows]
@@ -578,6 +795,14 @@ def build():
         for m in all_tabs
     )
 
+    market_descriptions = {name: market_description(name, markets_cfg) for name in markets_cfg.keys()}
+    for m in markets:
+        market_descriptions.setdefault(m, DEFAULT_MARKET_DESCRIPTIONS.get(m, ""))
+    market_pop_html = "".join(
+        f"<p><b>{html.escape(name)}:</b> {html.escape(desc)}</p>"
+        for name, desc in market_descriptions.items() if name != "Не определено"
+    ) or "<p>Рынки ещё не заданы в config/parameters.yaml -> markets</p>"
+
     tier_lookup = build_tier_lookup(cfg)
     tier_values = list(tier_lookup.keys()) or ["1", "2", "3"]
     tier_buttons_html = '<button class="tierbtn active" data-tier="Все">Все</button>' + "".join(
@@ -588,9 +813,19 @@ def build():
         for t, names in tier_lookup.items()
     ) or "<p>Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
-    cards_html = "".join(render_card(r, c) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
+    cards_html = "".join(render_card(r, c, tier_lookup, market_descriptions) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
     criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
+
+    repo = str(dash_cfg.get("github_repo", "")).strip()
+    if repo:
+        refresh_href = f"https://github.com/{html.escape(repo)}/actions/workflows/weekly_signal_scan.yml"
+        refresh_disabled_class = ""
+        refresh_note = "Откроется страница Actions на GitHub — там нажмите «Run workflow», чтобы запустить обновление."
+    else:
+        refresh_href = "#"
+        refresh_disabled_class = " disabled"
+        refresh_note = "Укажите dashboard.github_repo (вида username/repo) в config/parameters.yaml, чтобы кнопка вела на страницу запуска."
 
     OUT_PATH.parent.mkdir(exist_ok=True)
     OUT_PATH.write_text(
@@ -601,12 +836,17 @@ def build():
             green_count=colors.count("green"),
             yellow_count=colors.count("yellow"),
             red_count=colors.count("red"),
+            grey_count=colors.count("grey"),
             tabs=tabs_html,
+            market_pop=market_pop_html,
             tier_buttons=tier_buttons_html,
             tier_pop=tier_pop_html,
             cards=cards_html,
             signals_json=signals_json,
             criteria_labels_json=criteria_labels_json,
+            refresh_href=refresh_href,
+            refresh_disabled_class=refresh_disabled_class,
+            refresh_note=refresh_note,
         ),
         encoding="utf-8",
     )
