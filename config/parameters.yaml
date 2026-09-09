@@ -24,6 +24,7 @@ traffic_light_thresholds:
 dashboard:
   title: "Точки роста — Авито.Работа"
   accent_color: "#7C3AED"
+  github_repo: "tldtv/ai"
   # Ориентир на фирменный фиолетовый Авито
 
 # Веса критериев приоритизации. Меняя веса мы не трогаем код — модель получает актуальный список критериев при каждом запуске.
@@ -47,10 +48,13 @@ process_constraints:
 markets:
   Классифайд:
     keywords: ["job board", "classifieds", "vacancy marketplace", "listing"]
+    description: "Классифайд/джоборды — размещение вакансий как объявлений, без транзакционной модели внутри платформы."
   Подработка:
     keywords: ["gig", "earned wage", "instant pay", "staffing platform", "marketplace", "hourly", "shift", "gig worker"]
+    description: "Авито.Подработка — транзакционная платформенная занятость: смены и гиг-задачи, сделка происходит внутри платформы."
   HR-tech:
     keywords: ["recruit", "ats", "screening", "interview", "hiring workflow", "hr tech", "talent", "ai recruiter"]
+    description: "HR-tech — продукты HRmost и AIR: инструменты автоматизации найма и рекрутинга для бизнеса."
 
 # Модель для смыслового анализа (src/analyze_signals.py).
 llm:
