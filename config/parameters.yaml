@@ -25,6 +25,13 @@ dashboard:
   title: "Точки роста — Авито.Работа"
   accent_color: "#7C3AED"
   github_repo: "tldtv/ai"
+  firebase:
+    apiKey: "AIzaSyA2e9RTnznpcBJ7ofwzYNE9OlNyphWXyvE",
+    authDomain: "avito-signal-agent.firebaseapp.com",
+    projectId: "avito-signal-agent",
+    storageBucket: "avito-signal-agent.firebasestorage.app",
+    messagingSenderId: "622646642971",
+    appId: "1:622646642971:web:d2fba93b2c4d3611182bbe"
   # Ориентир на фирменный фиолетовый Авито
 
 # Веса критериев приоритизации. Меняя веса мы не трогаем код — модель получает актуальный список критериев при каждом запуске.
