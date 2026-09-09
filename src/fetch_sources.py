@@ -83,7 +83,7 @@ def fetch(mode="weekly", start=None, end=None):
             summary = entry.get("summary", "")
             item = {
                 "source_name": src["name"],
-                "tier": src.get("tier"),
+                "group": src.get("group"),
                 "url": url,
                 "published": pub_dt.date().isoformat() if pub_dt else "",
                 "title": title,

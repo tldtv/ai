@@ -139,7 +139,8 @@ def analyze():
                 "date_found": date.today().isoformat(),
                 "source_url": item["url"],
                 "source_date": item["published"],
-                "source_tier": item.get("tier", ""),
+                "source_tier": item.get("group", ""),  # поле называется source_tier по
+                # историческим причинам, хранит название группы источника
                 "in_target_window": item["in_target_window"],
                 "market_guess": item["market_guess"],
                 "title": item["title"],

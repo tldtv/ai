@@ -138,16 +138,16 @@ TEMPLATE = """<!doctype html>
   .filter-group{{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}}
   .filter-label{{font-size:12px;color:var(--ink-soft);margin-right:2px;}}
   .tabs, .sort{{display:flex;gap:8px;flex-wrap:wrap;}}
-  .tab, .sortbtn, .tierbtn{{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}}
-  .tab.active, .sortbtn.active, .tierbtn.active{{background:var(--accent);color:#fff;border-color:var(--accent);}}
+  .tab, .sortbtn, .groupbtn{{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}}
+  .tab.active, .sortbtn.active, .groupbtn.active{{background:var(--accent);color:#fff;border-color:var(--accent);}}
   .sort{{font-size:12px;color:var(--ink-soft);align-items:center;}}
 
-  .tier-info{{position:relative;display:inline-flex;}}
+  .info-popover{{position:relative;display:inline-flex;}}
   .info-btn{{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);font-size:12px;cursor:pointer;line-height:1;}}
-  .tier-pop{{position:absolute;top:28px;left:0;z-index:10;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;width:260px;box-shadow:0 6px 20px rgba(0,0,0,.08);font-size:12.5px;line-height:1.5;}}
-  .tier-pop b{{color:var(--ink);}}
-  .tier-pop p{{margin:0 0 6px;}}
-  .tier-pop p:last-child{{margin-bottom:0;}}
+  .info-pop{{position:absolute;top:28px;left:0;z-index:10;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;width:260px;box-shadow:0 6px 20px rgba(0,0,0,.08);font-size:12.5px;line-height:1.5;}}
+  .info-pop b{{color:var(--ink);}}
+  .info-pop p{{margin:0 0 6px;}}
+  .info-pop p:last-child{{margin-bottom:0;}}
 
   .date-range, .score-range{{display:flex;align-items:center;gap:6px;}}
   .date-range input[type=date]{{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}}
@@ -254,17 +254,17 @@ TEMPLATE = """<!doctype html>
       <div class="filter-group">
         <span class="filter-label">Рынок:</span>
         <div class="tabs" id="tabs">{tabs}</div>
-        <div class="tier-info">
+        <div class="info-popover">
           <button class="info-btn" id="marketInfoBtn" type="button" aria-expanded="false" aria-label="Что означает каждый рынок">i</button>
-          <div class="tier-pop" id="marketPop" hidden>{market_pop}</div>
+          <div class="info-pop" id="marketPop" hidden>{market_pop}</div>
         </div>
       </div>
       <div class="filter-group">
-        <span class="filter-label">Tier:</span>
-        <div class="tabs" id="tiers">{tier_buttons}</div>
-        <div class="tier-info">
-          <button class="info-btn" id="tierInfoBtn" type="button" aria-expanded="false" aria-label="Что входит в каждый tier">i</button>
-          <div class="tier-pop" id="tierPop" hidden>{tier_pop}</div>
+        <span class="filter-label">Группа источника:</span>
+        <div class="tabs" id="groups">{group_buttons}</div>
+        <div class="info-popover">
+          <button class="info-btn" id="groupInfoBtn" type="button" aria-expanded="false" aria-label="Что входит в каждую группу источников">i</button>
+          <div class="info-pop" id="groupPop" hidden>{group_pop}</div>
         </div>
       </div>
       <div class="filter-group">
@@ -324,7 +324,7 @@ TEMPLATE = """<!doctype html>
 </script>
 {firebase_scripts}
 <script>
-  const state = {{ market: 'Все', color: 'Все', tier: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '' }};
+  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '' }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
 
@@ -442,12 +442,12 @@ TEMPLATE = """<!doctype html>
     cards().forEach(c => {{
       const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
       const matchColor = state.color === 'Все' || c.dataset.color === state.color;
-      const matchTier = state.tier === 'Все' || c.dataset.tier === state.tier;
+      const matchGroup = state.group === 'Все' || c.dataset.group === state.group;
       const score = parseFloat(c.dataset.score);
       const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
       const d = c.dataset.date || '';
       const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
-      const show = matchMarket && matchColor && matchTier && matchScore && matchDate;
+      const show = matchMarket && matchColor && matchGroup && matchScore && matchDate;
       c.classList.toggle('hidden', !show);
       if (show) visible++;
     }});
@@ -477,10 +477,10 @@ TEMPLATE = """<!doctype html>
     apply();
   }});
 
-  document.getElementById('tiers').addEventListener('click', e => {{
-    if (!e.target.classList.contains('tierbtn')) return;
-    state.tier = e.target.dataset.tier;
-    document.querySelectorAll('#tiers .tierbtn').forEach(t => t.classList.toggle('active', t === e.target));
+  document.getElementById('groups').addEventListener('click', e => {{
+    if (!e.target.classList.contains('groupbtn')) return;
+    state.group = e.target.dataset.group;
+    document.querySelectorAll('#groups .groupbtn').forEach(t => t.classList.toggle('active', t === e.target));
     apply();
   }});
 
@@ -507,14 +507,14 @@ TEMPLATE = """<!doctype html>
       btn.setAttribute('aria-expanded', String(open));
     }});
   }}
-  const tierInfoBtn = document.getElementById('tierInfoBtn');
-  const tierPop = document.getElementById('tierPop');
+  const groupInfoBtn = document.getElementById('groupInfoBtn');
+  const groupPop = document.getElementById('groupPop');
   const marketInfoBtn = document.getElementById('marketInfoBtn');
   const marketPop = document.getElementById('marketPop');
-  togglePop(tierInfoBtn, tierPop);
+  togglePop(groupInfoBtn, groupPop);
   togglePop(marketInfoBtn, marketPop);
   document.addEventListener('click', e => {{
-    if (!tierPop.contains(e.target) && e.target !== tierInfoBtn) tierPop.setAttribute('hidden', '');
+    if (!groupPop.contains(e.target) && e.target !== groupInfoBtn) groupPop.setAttribute('hidden', '');
     if (!marketPop.contains(e.target) && e.target !== marketInfoBtn) marketPop.setAttribute('hidden', '');
   }});
 
@@ -668,10 +668,11 @@ TEMPLATE = """<!doctype html>
       return `Идеи в «${{marketHit}}»:\\n` + subset.map(r => '• ' + fmtIdea(r)).join('\\n');
     }}
 
-    const tierMatch = q.match(/tier ?([123])/);
-    if (tierMatch) {{
-      const subset = rows.filter(r => String(r.source_tier) === tierMatch[1]);
-      return subset.length ? `Tier ${{tierMatch[1]}}:\\n` + subset.map(r => '• ' + fmtIdea(r)).join('\\n') : `Пока нет идей из tier ${{tierMatch[1]}}.`;
+    const groupNames = [...new Set(rows.map(r => r.source_tier).filter(Boolean))];
+    const groupHit = groupNames.find(g => q.includes(g.toLowerCase()));
+    if (groupHit) {{
+      const subset = rows.filter(r => r.source_tier === groupHit);
+      return subset.length ? `Группа «${{groupHit}}»:\\n` + subset.map(r => '• ' + fmtIdea(r)).join('\\n') : `Пока нет идей из группы «${{groupHit}}».`;
     }}
 
     if (/(почему|разбивк|из чего|критери)/.test(q)) {{
@@ -692,7 +693,7 @@ TEMPLATE = """<!doctype html>
       return `${{fmtIdea(direct)}}\\nГипотеза: ${{direct.opportunity_hypothesis || '—'}}\\nОсновные неизвестные: ${{direct.key_unknowns || '—'}}`;
     }}
 
-    return 'Могу подсказать: сколько идей зелёных/жёлтых/красных, какая идея топ по оценке, что в рынке «Классифайд»/«Подработка»/«HR-tech», идеи из tier 1/2/3, идеи с низкой или высокой уверенностью, разбивку оценки конкретной идеи — назовите её словами из заголовка.';
+    return 'Могу подсказать: сколько идей зелёных/жёлтых/красных, какая идея топ по оценке, что в рынке «Классифайд»/«Подработка»/«HR-tech», идеи из группы источников (например «РФ/ТГ» или «Мировой»), идеи с низкой или высокой уверенностью, разбивку оценки конкретной идеи — назовите её словами из заголовка.';
   }}
 
   function handleQuestion(text) {{
@@ -755,29 +756,38 @@ def render_breakdown(row):
     return f'<details class="breakdown"><summary>Разбивка оценки</summary><ul>{items}</ul></details>'
 
 
-def render_card(row, color, tier_lookup, market_descriptions):
+def render_card(row, color, group_lookup, group_descriptions, market_descriptions):
     market = row.get("market_guess", "") or "Не определено"
     cluster = row.get("cluster_id", "")
     status = row.get("status", "") or "new"
     confidence = row.get("confidence", "") or "—"
     score = row.get("priority_score") or "—"
-    tier = (row.get("source_tier") or "").strip()
+    # Поле называется source_tier по историческим причинам (раньше здесь
+    # хранился номер tier), но с переходом на именованные группы источников
+    # хранит название группы — колонку решили не переименовывать, чтобы не
+    # заставлять вас вручную править уже накопленный backlog.csv.
+    group = (row.get("source_tier") or "").strip()
     in_window = str(row.get("in_target_window", "")).strip().lower()
     window_flag = '<span class="flag">вне целевого окна</span>' if in_window in ("false", "0", "нет") else ""
 
     market_tip = html.escape(market_descriptions.get(market, ""))
     badges = f'<span class="pill market" tabindex="0" data-tip="{market_tip}">{html.escape(market)}</span>'
-    if tier:
-        tier_sources = tier_lookup.get(tier, [])
-        tier_tip = html.escape(("Источники tier " + tier + ": " + ", ".join(tier_sources)) if tier_sources else "")
-        badges += f'<span class="pill" tabindex="0" data-tip="{tier_tip}">tier {html.escape(tier)}</span>'
+    if group:
+        group_sources = group_lookup.get(group, [])
+        tip_parts = []
+        if group_descriptions.get(group):
+            tip_parts.append(group_descriptions[group])
+        if group_sources:
+            tip_parts.append("Источники: " + ", ".join(group_sources))
+        group_tip = html.escape(" ".join(tip_parts))
+        badges += f'<span class="pill" tabindex="0" data-tip="{group_tip}">{html.escape(group)}</span>'
     if cluster:
         badges += f'<span class="pill">кластер {html.escape(cluster)}</span>'
 
     key = html.escape((row.get("source_url", "").strip() or row.get("title", "")) + "|" + row.get("title", ""))
 
     return f"""
-    <article class="card {color}" data-key="{key}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-tier="{html.escape(tier)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
+    <article class="card {color}" data-key="{key}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-group="{html.escape(group)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
       <div class="card-top">
         <span class="pill {color}">{html.escape(str(score))}</span>
         <span class="pill status">{html.escape(status)}</span>
@@ -832,13 +842,20 @@ def _to_float(value):
         return None
 
 
-def build_tier_lookup(cfg):
-    """Группирует источники из config -> sources по tier, для подсказки."""
-    by_tier = {}
+def build_group_lookup(cfg):
+    """Группирует источники из config -> sources по source.group, для
+    подсказки и для фильтра. Порядок групп — как в config -> source_groups
+    (если он есть), иначе как источники впервые встретились в sources."""
+    by_group = {}
     for src in cfg.get("sources", []):
-        t = str(src.get("tier", "—"))
-        by_tier.setdefault(t, []).append(src.get("name", "?"))
-    return dict(sorted(by_tier.items()))
+        g = str(src.get("group") or "Без группы")
+        by_group.setdefault(g, []).append(src.get("name", "?"))
+    declared_order = list((cfg.get("source_groups") or {}).keys())
+    ordered = {g: by_group[g] for g in declared_order if g in by_group}
+    for g, names in by_group.items():
+        if g not in ordered:
+            ordered[g] = names
+    return ordered
 
 
 def market_description(name, markets_cfg):
@@ -874,17 +891,20 @@ def build():
         for name, desc in market_descriptions.items() if name != "Не определено"
     ) or "<p>Рынки ещё не заданы в config/parameters.yaml -> markets</p>"
 
-    tier_lookup = build_tier_lookup(cfg)
-    tier_values = list(tier_lookup.keys()) or ["1", "2", "3"]
-    tier_buttons_html = '<button class="tierbtn active" data-tier="Все">Все</button>' + "".join(
-        f'<button class="tierbtn" data-tier="{html.escape(t)}">{html.escape(t)}</button>' for t in tier_values
+    source_groups_cfg = cfg.get("source_groups", {}) or {}
+    group_descriptions = {name: (info or {}).get("description", "") for name, info in source_groups_cfg.items()}
+    group_lookup = build_group_lookup(cfg)
+    group_values = list(group_lookup.keys())
+    group_buttons_html = '<button class="groupbtn active" data-group="Все">Все</button>' + "".join(
+        f'<button class="groupbtn" data-group="{html.escape(g)}">{html.escape(g)}</button>' for g in group_values
     )
-    tier_pop_html = "".join(
-        f"<p><b>Tier {html.escape(t)}:</b> {html.escape(', '.join(names))}</p>"
-        for t, names in tier_lookup.items()
+    group_pop_html = "".join(
+        f"<p><b>{html.escape(g)}:</b> {html.escape(group_descriptions.get(g, ''))}"
+        f"<br>Источники: {html.escape(', '.join(names))}</p>"
+        for g, names in group_lookup.items()
     ) or "<p>Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
-    cards_html = "".join(render_card(r, c, tier_lookup, market_descriptions) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
+    cards_html = "".join(render_card(r, c, group_lookup, group_descriptions, market_descriptions) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
     criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
 
@@ -929,8 +949,8 @@ def build():
             grey_count=colors.count("grey"),
             tabs=tabs_html,
             market_pop=market_pop_html,
-            tier_buttons=tier_buttons_html,
-            tier_pop=tier_pop_html,
+            group_buttons=group_buttons_html,
+            group_pop=group_pop_html,
             cards=cards_html,
             signals_json=signals_json,
             criteria_labels_json=criteria_labels_json,
