@@ -1,9 +1,12 @@
 """
 build_dashboard.py — читает data/backlog.csv и собирает docs/index.html:
-дашборд со сводной статистикой, вкладками по рынкам, светофором
-(красный/жёлтый/зелёный) по полю priority_score и сортировкой/фильтрами.
-Пороги светофора и визуальные настройки (акцентный цвет, заголовок)
-берутся из config/parameters.yaml -> dashboard / traffic_light_thresholds.
+дашборд со сводной статистикой, вкладками по рынкам, фильтром по тиру
+источника (с подсказкой, какие источники в каком тире — берётся из
+config/parameters.yaml -> sources, отдельно вести не нужно), светофором
+(красный/жёлтый/зелёный) по полю priority_score, сортировкой и
+разбивкой оценки по критериям на каждой карточке. Пороги светофора и
+визуальные настройки — из config/parameters.yaml -> dashboard /
+traffic_light_thresholds.
 
 docs/index.html обслуживается GitHub Pages (Settings -> Pages -> Deploy
 from a branch -> main -> /docs), поэтому после каждого пуша страница по
@@ -11,6 +14,7 @@ from a branch -> main -> /docs), поэтому после каждого пуш
 """
 import csv
 import html
+import json
 from pathlib import Path
 
 import yaml
@@ -24,6 +28,16 @@ DEFAULT_TITLE = "Точки роста — Авито.Работа"
 DEFAULT_ACCENT = "#7C3AED"  # ориентир на фирменный фиолетовый Авито —
 # точный HEX не подтверждён официальным брендбуком, при необходимости
 # замените здесь или через config/parameters.yaml -> dashboard.accent_color
+
+CRITERIA_LABELS = {
+    "strategic_fit": "Соответствие рынку",
+    "signal_strength": "Сила сигнала",
+    "market_growth": "Размер/рост рынка",
+    "asset_fit": "Fit с активами Авито",
+    "feasibility": "Реализуемость MVP",
+    "urgency": "Срочность/окно",
+    "regulatory_risk": "Регуляторный риск",
+}
 
 TEMPLATE = """<!doctype html>
 <html lang="ru">
@@ -60,11 +74,21 @@ TEMPLATE = """<!doctype html>
   .stat.red{{border-left-color:var(--red);}}
   .stat.active{{outline:2px solid var(--accent);outline-offset:-1px;}}
 
-  .toolbar{{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px;}}
+  .toolbar{{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px 20px;margin-bottom:18px;}}
+  .filters{{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;}}
+  .filter-group{{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}}
+  .filter-label{{font-size:12px;color:var(--ink-soft);margin-right:2px;}}
   .tabs, .sort{{display:flex;gap:8px;flex-wrap:wrap;}}
-  .tab, .sortbtn{{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}}
-  .tab.active, .sortbtn.active{{background:var(--accent);color:#fff;border-color:var(--accent);}}
+  .tab, .sortbtn, .tierbtn{{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}}
+  .tab.active, .sortbtn.active, .tierbtn.active{{background:var(--accent);color:#fff;border-color:var(--accent);}}
   .sort{{font-size:12px;color:var(--ink-soft);align-items:center;}}
+
+  .tier-info{{position:relative;display:inline-flex;}}
+  .info-btn{{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);font-size:12px;cursor:pointer;line-height:1;}}
+  .tier-pop{{position:absolute;top:28px;left:0;z-index:10;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;width:260px;box-shadow:0 6px 20px rgba(0,0,0,.08);font-size:12.5px;line-height:1.5;}}
+  .tier-pop b{{color:var(--ink);}}
+  .tier-pop p{{margin:0 0 6px;}}
+  .tier-pop p:last-child{{margin-bottom:0;}}
 
   .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}}
   .card{{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--grey);border-radius:10px;padding:14px;}}
@@ -82,10 +106,37 @@ TEMPLATE = """<!doctype html>
   .pill.market{{background:var(--accent-soft);color:var(--accent);}}
   .pill.status{{background:var(--grey-soft);color:var(--grey-ink);}}
   .hyp{{font-size:13px;color:#444;margin:0 0 8px;}}
-  .meta{{font-size:11.5px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;}}
+  .meta{{font-size:11.5px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:0 0 6px;}}
   .meta a{{color:var(--accent);}}
   .flag{{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}}
   .empty{{color:#999;font-size:13px;grid-column:1/-1;}}
+
+  .breakdown{{margin-top:6px;}}
+  .breakdown summary{{font-size:12px;color:var(--accent);cursor:pointer;list-style:none;}}
+  .breakdown summary::-webkit-details-marker{{display:none;}}
+  .breakdown summary::before{{content:"▸ ";}}
+  .breakdown[open] summary::before{{content:"▾ ";}}
+  .breakdown ul{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}}
+  .breakdown li{{display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
+  .breakdown li:first-child{{border-top:none;}}
+  .breakdown .val{{font-weight:700;color:var(--ink);}}
+
+  .assistant-toggle{{position:fixed;right:20px;bottom:20px;z-index:20;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:12px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;}}
+  .assistant-panel{{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .22s ease;z-index:30;display:flex;flex-direction:column;}}
+  .assistant-panel.open{{transform:translateX(0);}}
+  .assistant-head{{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);}}
+  .assistant-head h2{{font-size:14px;margin:0;}}
+  .assistant-head p{{font-size:11px;color:var(--ink-soft);margin:2px 0 0;}}
+  .assistant-close{{background:none;border:none;font-size:18px;color:var(--ink-soft);cursor:pointer;line-height:1;padding:4px;}}
+  .assistant-chips{{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);}}
+  .chip{{font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
+  .assistant-log{{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}}
+  .msg{{font-size:13px;line-height:1.5;padding:9px 12px;border-radius:12px;max-width:86%;white-space:pre-wrap;}}
+  .msg.user{{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px;}}
+  .msg.bot{{align-self:flex-start;background:var(--bg);border:1px solid var(--border);border-bottom-left-radius:3px;}}
+  .assistant-form{{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);}}
+  .assistant-form input{{flex:1;font:inherit;font-size:13px;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);}}
+  .assistant-form button{{font:inherit;font-size:13px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;}}
 </style>
 </head>
 <body>
@@ -108,7 +159,20 @@ TEMPLATE = """<!doctype html>
   </div>
 
   <div class="toolbar">
-    <div class="tabs" id="tabs">{tabs}</div>
+    <div class="filters">
+      <div class="filter-group">
+        <span class="filter-label">Рынок:</span>
+        <div class="tabs" id="tabs">{tabs}</div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Tier:</span>
+        <div class="tabs" id="tiers">{tier_buttons}</div>
+        <div class="tier-info">
+          <button class="info-btn" id="tierInfoBtn" type="button" aria-expanded="false" aria-label="Что входит в каждый tier">i</button>
+          <div class="tier-pop" id="tierPop" hidden>{tier_pop}</div>
+        </div>
+      </div>
+    </div>
     <div class="sort" id="sort">
       Сортировка:
       <button class="sortbtn active" data-sort="score">по оценке</button>
@@ -118,8 +182,33 @@ TEMPLATE = """<!doctype html>
 
   <div class="grid" id="grid">{cards}</div>
 
+  <button class="assistant-toggle" id="assistantToggle" type="button">💬 Помощник</button>
+  <aside class="assistant-panel" id="assistantPanel" aria-hidden="true">
+    <div class="assistant-head">
+      <div>
+        <h2>Помощник по дашборду</h2>
+        <p>Отвечает по данным на странице, без внешних запросов</p>
+      </div>
+      <button class="assistant-close" id="assistantClose" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="assistant-chips" id="assistantChips">
+      <button class="chip" type="button">Сколько зелёных идей?</button>
+      <button class="chip" type="button">Топ идея по оценке</button>
+      <button class="chip" type="button">Идеи с низкой уверенностью</button>
+    </div>
+    <div class="assistant-log" id="assistantLog"></div>
+    <form class="assistant-form" id="assistantForm">
+      <input type="text" id="assistantInput" placeholder="Спросите про идеи…" autocomplete="off">
+      <button type="submit">→</button>
+    </form>
+  </aside>
+
 <script>
-  const state = {{ market: 'Все', color: 'Все', sort: 'score' }};
+  window.SIGNALS = {signals_json};
+  window.CRITERIA_LABELS = {criteria_labels_json};
+</script>
+<script>
+  const state = {{ market: 'Все', color: 'Все', tier: 'Все', sort: 'score' }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
 
@@ -128,7 +217,8 @@ TEMPLATE = """<!doctype html>
     cards().forEach(c => {{
       const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
       const matchColor = state.color === 'Все' || c.dataset.color === state.color;
-      const show = matchMarket && matchColor;
+      const matchTier = state.tier === 'Все' || c.dataset.tier === state.tier;
+      const show = matchMarket && matchColor && matchTier;
       c.classList.toggle('hidden', !show);
       if (show) visible++;
     }});
@@ -154,7 +244,14 @@ TEMPLATE = """<!doctype html>
   document.getElementById('tabs').addEventListener('click', e => {{
     if (!e.target.classList.contains('tab')) return;
     state.market = e.target.dataset.market;
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === e.target));
+    document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t === e.target));
+    apply();
+  }});
+
+  document.getElementById('tiers').addEventListener('click', e => {{
+    if (!e.target.classList.contains('tierbtn')) return;
+    state.tier = e.target.dataset.tier;
+    document.querySelectorAll('#tiers .tierbtn').forEach(t => t.classList.toggle('active', t === e.target));
     apply();
   }});
 
@@ -173,8 +270,148 @@ TEMPLATE = """<!doctype html>
     sortCards();
   }});
 
+  const tierInfoBtn = document.getElementById('tierInfoBtn');
+  const tierPop = document.getElementById('tierPop');
+  tierInfoBtn.addEventListener('click', e => {{
+    e.stopPropagation();
+    const open = tierPop.hasAttribute('hidden');
+    if (open) tierPop.removeAttribute('hidden'); else tierPop.setAttribute('hidden', '');
+    tierInfoBtn.setAttribute('aria-expanded', String(open));
+  }});
+  document.addEventListener('click', e => {{
+    if (!tierPop.contains(e.target) && e.target !== tierInfoBtn) tierPop.setAttribute('hidden', '');
+  }});
+
   sortCards();
   apply();
+
+  // ---- Помощник по дашборду: локальная логика, без внешних вызовов ----
+  const panel = document.getElementById('assistantPanel');
+  const toggle = document.getElementById('assistantToggle');
+  const closeBtn = document.getElementById('assistantClose');
+  const log = document.getElementById('assistantLog');
+  const form = document.getElementById('assistantForm');
+  const input = document.getElementById('assistantInput');
+  const chips = document.getElementById('assistantChips');
+
+  function openPanel() {{ panel.classList.add('open'); panel.setAttribute('aria-hidden', 'false'); input.focus(); }}
+  function closePanel() {{ panel.classList.remove('open'); panel.setAttribute('aria-hidden', 'true'); }}
+  toggle.addEventListener('click', openPanel);
+  closeBtn.addEventListener('click', closePanel);
+
+  function addMsg(text, who) {{
+    const div = document.createElement('div');
+    div.className = 'msg ' + who;
+    div.textContent = text;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }}
+
+  const STOPWORDS = new Set(['как','что','это','для','или','идея','идеи','идею','про','по','на','с','в','у','и','а','из']);
+
+  function findByFragment(q) {{
+    const words = q.toLowerCase().split(/[^a-zа-яё0-9]+/i).filter(w => w.length > 3 && !STOPWORDS.has(w));
+    let best = null, bestScore = 0;
+    window.SIGNALS.forEach(r => {{
+      const t = (r.title + ' ' + r.opportunity_hypothesis).toLowerCase();
+      const score = words.reduce((acc, w) => acc + (t.includes(w) ? 1 : 0), 0);
+      if (score > bestScore) {{ bestScore = score; best = r; }}
+    }});
+    return bestScore > 0 ? best : null;
+  }}
+
+  function fmtIdea(r) {{
+    return `«${{r.title}}» — ${{r.priority_score ?? '—'}}/5, рынок: ${{r.market_guess}}, уверенность: ${{r.confidence || '—'}}`;
+  }}
+
+  function answer(raw) {{
+    const q = raw.toLowerCase().trim();
+    const rows = window.SIGNALS;
+    if (!rows.length) return 'В бэклоге пока нет идей — нечего анализировать.';
+
+    if (/сколько.*(зел[её]н)/.test(q)) {{
+      const n = rows.filter(r => r.color === 'green').length;
+      return `Зелёных идей: ${{n}} из ${{rows.length}}.`;
+    }}
+    if (/сколько.*(жёлт|желт)/.test(q)) {{
+      const n = rows.filter(r => r.color === 'yellow').length;
+      return `Жёлтых идей: ${{n}} из ${{rows.length}}.`;
+    }}
+    if (/сколько.*красн/.test(q)) {{
+      const n = rows.filter(r => r.color === 'red').length;
+      return `Красных идей: ${{n}} из ${{rows.length}}.`;
+    }}
+
+    if (/(топ|лучш|самая высок|самый приоритет|максимальн)/.test(q)) {{
+      const top = [...rows].sort((a, b) => (b.priority_score||0) - (a.priority_score||0))[0];
+      return top ? `Сейчас в топе: ${{fmtIdea(top)}}.\\nГипотеза: ${{top.opportunity_hypothesis || '—'}}` : 'Нет данных.';
+    }}
+
+    if (/низк.*уверен/.test(q)) {{
+      const subset = rows.filter(r => (r.confidence||'').toLowerCase().includes('низ'));
+      if (!subset.length) return 'Идей с низкой уверенностью сейчас нет.';
+      return 'С низкой уверенностью:\\n' + subset.map(r => '• ' + fmtIdea(r)).join('\\n');
+    }}
+    if (/высок.*уверен/.test(q)) {{
+      const subset = rows.filter(r => (r.confidence||'').toLowerCase().includes('высок'));
+      if (!subset.length) return 'Идей с высокой уверенностью пока нет.';
+      return 'С высокой уверенностью:\\n' + subset.map(r => '• ' + fmtIdea(r)).join('\\n');
+    }}
+
+    const marketNames = [...new Set(rows.map(r => r.market_guess))];
+    const marketHit = marketNames.find(m => q.includes(m.toLowerCase()));
+    if (marketHit) {{
+      const subset = rows.filter(r => r.market_guess === marketHit);
+      if (/сколько/.test(q)) return `В «${{marketHit}}» сейчас ${{subset.length}} иде${{subset.length === 1 ? 'я' : 'й'}}.`;
+      return `Идеи в «${{marketHit}}»:\\n` + subset.map(r => '• ' + fmtIdea(r)).join('\\n');
+    }}
+
+    const tierMatch = q.match(/tier ?([123])/);
+    if (tierMatch) {{
+      const subset = rows.filter(r => String(r.source_tier) === tierMatch[1]);
+      return subset.length ? `Tier ${{tierMatch[1]}}:\\n` + subset.map(r => '• ' + fmtIdea(r)).join('\\n') : `Пока нет идей из tier ${{tierMatch[1]}}.`;
+    }}
+
+    if (/(почему|разбивк|из чего|критери)/.test(q)) {{
+      const match = findByFragment(q);
+      if (match && match.criteria_scores && Object.keys(match.criteria_scores).length) {{
+        const lines = Object.entries(match.criteria_scores).map(([k, v]) => `• ${{window.CRITERIA_LABELS[k] || k}}: ${{v}}/5`);
+        return `Разбивка «${{match.title}}» (итог ${{match.priority_score}}/5):\\n` + lines.join('\\n');
+      }}
+      return 'Не нашёл подходящую идею по названию — попробуйте назвать её словами из заголовка, или для этой записи разбивка ещё не собрана.';
+    }}
+
+    if (/сколько.*(всего|идей)|сколько идей/.test(q)) {{
+      return `Всего идей в бэклоге: ${{rows.length}}.`;
+    }}
+
+    const direct = findByFragment(q);
+    if (direct) {{
+      return `${{fmtIdea(direct)}}\\nГипотеза: ${{direct.opportunity_hypothesis || '—'}}\\nОсновные неизвестные: ${{direct.key_unknowns || '—'}}`;
+    }}
+
+    return 'Могу подсказать: сколько идей зелёных/жёлтых/красных, какая идея топ по оценке, что в рынке «Классифайд»/«Подработка»/«HR-tech», идеи из tier 1/2/3, идеи с низкой или высокой уверенностью, разбивку оценки конкретной идеи — назовите её словами из заголовка.';
+  }}
+
+  function handleQuestion(text) {{
+    if (!text.trim()) return;
+    addMsg(text, 'user');
+    setTimeout(() => addMsg(answer(text), 'bot'), 150);
+  }}
+
+  form.addEventListener('submit', e => {{
+    e.preventDefault();
+    const text = input.value;
+    input.value = '';
+    handleQuestion(text);
+  }});
+
+  chips.addEventListener('click', e => {{
+    if (!e.target.classList.contains('chip')) return;
+    handleQuestion(e.target.textContent);
+  }});
+
+  addMsg('Привет! Спросите что-нибудь про идеи в бэклоге — отвечаю по данным на странице, ничего никуда не отправляю.', 'bot');
 </script>
 </body>
 </html>"""
@@ -199,21 +436,39 @@ def traffic_light(score_str, thresholds):
     return "red"
 
 
+def render_breakdown(row):
+    raw = row.get("criteria_scores") or ""
+    try:
+        scores = json.loads(raw) if raw else {}
+    except (json.JSONDecodeError, TypeError):
+        scores = {}
+    if not scores:
+        return ""
+    items = "".join(
+        f'<li><span>{html.escape(CRITERIA_LABELS.get(k, k))}</span><span class="val">{html.escape(str(v))}/5</span></li>'
+        for k, v in scores.items()
+    )
+    return f'<details class="breakdown"><summary>Разбивка оценки</summary><ul>{items}</ul></details>'
+
+
 def render_card(row, color):
     market = row.get("market_guess", "") or "Не определено"
     cluster = row.get("cluster_id", "")
     status = row.get("status", "") or "new"
     confidence = row.get("confidence", "") or "—"
     score = row.get("priority_score") or "—"
+    tier = (row.get("source_tier") or "").strip()
     in_window = str(row.get("in_target_window", "")).strip().lower()
     window_flag = '<span class="flag">вне целевого окна</span>' if in_window in ("false", "0", "нет") else ""
 
     badges = f'<span class="pill market">{html.escape(market)}</span>'
+    if tier:
+        badges += f'<span class="pill">tier {html.escape(tier)}</span>'
     if cluster:
         badges += f'<span class="pill">кластер {html.escape(cluster)}</span>'
 
     return f"""
-    <article class="card {color}" data-market="{html.escape(market)}" data-color="{color}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
+    <article class="card {color}" data-market="{html.escape(market)}" data-color="{color}" data-tier="{html.escape(tier)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
       <div class="card-top">
         <span class="pill {color}">{html.escape(str(score))}</span>
         <span class="pill status">{html.escape(status)}</span>
@@ -227,7 +482,50 @@ def render_card(row, color):
         · уверенность: {html.escape(confidence)}
         {window_flag}
       </p>
+      {render_breakdown(row)}
     </article>"""
+
+
+def build_signals_json(rows, colors):
+    """Готовит компактный список сигналов для клиентского помощника —
+    те же данные, что уже на странице, просто в удобной для JS форме."""
+    signals = []
+    for row, color in zip(rows, colors):
+        raw = row.get("criteria_scores") or ""
+        try:
+            criteria_scores = json.loads(raw) if raw else {}
+        except (json.JSONDecodeError, TypeError):
+            criteria_scores = {}
+        signals.append({
+            "title": row.get("title", ""),
+            "market_guess": row.get("market_guess", "") or "Не определено",
+            "priority_score": _to_float(row.get("priority_score")),
+            "confidence": row.get("confidence", ""),
+            "opportunity_hypothesis": row.get("opportunity_hypothesis", ""),
+            "key_unknowns": row.get("key_unknowns", ""),
+            "criteria_scores": criteria_scores,
+            "color": color,
+            "source_tier": row.get("source_tier", ""),
+            "status": row.get("status", ""),
+        })
+    # экранируем "</" на случай спецсимволов в тексте, чтобы не оборвать <script>
+    return json.dumps(signals, ensure_ascii=False).replace("</", "<\\/")
+
+
+def _to_float(value):
+    try:
+        return round(float(value), 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def build_tier_lookup(cfg):
+    """Группирует источники из config -> sources по tier, для подсказки."""
+    by_tier = {}
+    for src in cfg.get("sources", []):
+        t = str(src.get("tier", "—"))
+        by_tier.setdefault(t, []).append(src.get("name", "?"))
+    return dict(sorted(by_tier.items()))
 
 
 def build():
@@ -247,7 +545,19 @@ def build():
         for m in all_tabs
     )
 
+    tier_lookup = build_tier_lookup(cfg)
+    tier_values = list(tier_lookup.keys()) or ["1", "2", "3"]
+    tier_buttons_html = '<button class="tierbtn active" data-tier="Все">Все</button>' + "".join(
+        f'<button class="tierbtn" data-tier="{html.escape(t)}">{html.escape(t)}</button>' for t in tier_values
+    )
+    tier_pop_html = "".join(
+        f"<p><b>Tier {html.escape(t)}:</b> {html.escape(', '.join(names))}</p>"
+        for t, names in tier_lookup.items()
+    ) or "<p>Источники ещё не заданы в config/parameters.yaml -> sources</p>"
+
     cards_html = "".join(render_card(r, c) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
+    signals_json = build_signals_json(rows, colors)
+    criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
 
     OUT_PATH.parent.mkdir(exist_ok=True)
     OUT_PATH.write_text(
@@ -259,7 +569,11 @@ def build():
             yellow_count=colors.count("yellow"),
             red_count=colors.count("red"),
             tabs=tabs_html,
+            tier_buttons=tier_buttons_html,
+            tier_pop=tier_pop_html,
             cards=cards_html,
+            signals_json=signals_json,
+            criteria_labels_json=criteria_labels_json,
         ),
         encoding="utf-8",
     )
