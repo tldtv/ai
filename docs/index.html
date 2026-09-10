@@ -71,8 +71,8 @@
   .filter-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .filter-label{font-size:12px;color:var(--ink-soft);margin-right:2px;}
   .tabs, .sort{display:flex;gap:8px;flex-wrap:wrap;}
-  .tab, .sortbtn, .groupbtn{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}
-  .tab.active, .sortbtn.active, .groupbtn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tab, .sortbtn, .groupbtn, .freshbtn{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}
+  .tab.active, .sortbtn.active, .groupbtn.active, .freshbtn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .sort{font-size:12px;color:var(--ink-soft);align-items:center;}
 
   .info-popover{position:relative;display:inline-flex;}
@@ -277,6 +277,7 @@
           <span>—</span>
           <input type="date" id="dateTo" aria-label="По дату">
         </div>
+        <button class="freshbtn" id="freshBtn" type="button" title="Показать сигналы, найденные за последние 7 дней">🆕 Свежак</button>
       </div>
     </div>
     <div class="sort" id="sort">
@@ -2166,8 +2167,29 @@
   // ---- Диапазон даты источника ----
   const dateFrom = document.getElementById('dateFrom');
   const dateTo = document.getElementById('dateTo');
-  dateFrom.addEventListener('change', () => { state.dateFrom = dateFrom.value; apply(); });
-  dateTo.addEventListener('change', () => { state.dateTo = dateTo.value; apply(); });
+  const freshBtn = document.getElementById('freshBtn');
+  dateFrom.addEventListener('change', () => { state.dateFrom = dateFrom.value; freshBtn.classList.remove('active'); apply(); });
+  dateTo.addEventListener('change', () => { state.dateTo = dateTo.value; freshBtn.classList.remove('active'); apply(); });
+
+  // «Свежак» — быстрый фильтр «за последние 7 дней» по дате обнаружения
+  // сигнала (date_found, то же поле, что и у обычных полей дат выше).
+  // Повторный клик по уже нажатой кнопке снимает фильтр целиком.
+  freshBtn.addEventListener('click', () => {
+    const isActive = freshBtn.classList.contains('active');
+    if (isActive) {
+      dateFrom.value = ''; dateTo.value = '';
+      state.dateFrom = ''; state.dateTo = '';
+      freshBtn.classList.remove('active');
+    } else {
+      const today = new Date();
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const iso = d => d.toISOString().slice(0, 10);
+      dateFrom.value = iso(weekAgo); dateTo.value = '';
+      state.dateFrom = iso(weekAgo); state.dateTo = '';
+      freshBtn.classList.add('active');
+    }
+    apply();
+  });
 
   const refreshBtn = document.getElementById('refreshBtn');
   if (refreshBtn.classList.contains('disabled')) {
