@@ -412,6 +412,7 @@ TEMPLATE = """<!doctype html>
 <script>
   window.SIGNALS = {signals_json};
   window.CRITERIA_LABELS = {criteria_labels_json};
+  window.CRITERIA_DESCRIPTIONS = {criteria_descriptions_json};
   window.DEFAULT_WEIGHTS = {weights_json};
   window.DEFAULT_THRESHOLDS = {thresholds_json};
   window.DEFAULT_VOTES_TO_PROMOTE = {votes_to_promote};
@@ -997,7 +998,7 @@ TEMPLATE = """<!doctype html>
     document.getElementById('cfgCadence').value = liveCadenceDays;
     cfgWeightsWrap.innerHTML = Object.keys(window.DEFAULT_WEIGHTS).map(k => `
       <div class="admin-row">
-        <label>${{window.CRITERIA_LABELS[k] || k}}</label>
+        <label class="crit-name" tabindex="0" data-tip="${{window.CRITERIA_DESCRIPTIONS[k] || ''}}">${{window.CRITERIA_LABELS[k] || k}}</label>
         <input type="number" step="0.1" min="0" max="5" data-weight="${{k}}" value="${{liveWeights[k] !== undefined ? liveWeights[k] : window.DEFAULT_WEIGHTS[k]}}">
       </div>`).join('');
   }}
@@ -1470,6 +1471,7 @@ def build():
     ) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
     criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
+    criteria_descriptions_json = json.dumps(CRITERIA_DESCRIPTIONS, ensure_ascii=False)
     weights_json = json.dumps(weights_cfg, ensure_ascii=False)
     thresholds_json = json.dumps(
         {"green_min": thresholds["green_min"], "yellow_min": thresholds["yellow_min"]}, ensure_ascii=False
@@ -1521,6 +1523,7 @@ def build():
             cards=cards_html,
             signals_json=signals_json,
             criteria_labels_json=criteria_labels_json,
+            criteria_descriptions_json=criteria_descriptions_json,
             weights_json=weights_json,
             thresholds_json=thresholds_json,
             votes_to_promote=votes_to_promote,
