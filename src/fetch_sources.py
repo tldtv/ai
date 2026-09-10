@@ -62,6 +62,9 @@ def fetch(mode="weekly", start=None, end=None):
     start = start or window["start"]
     end = end or window["end"]
     known_urls = load_known_urls()
+    # По умолчанию включено — см. комментарий у места использования ниже
+    # и config/parameters.yaml -> require_market_match.
+    require_market_match = cfg.get("require_market_match", True)
 
     new_items = []
     for src in cfg["sources"]:
@@ -81,6 +84,20 @@ def fetch(mode="weekly", start=None, end=None):
 
             title = entry.get("title", "")
             summary = entry.get("summary", "")
+            market_guess = tag_market(f"{title} {summary}", cfg["markets"])
+            known_urls.add(url)
+
+            # Требуем совпадение хотя бы одного ключевого слова рынка ДО
+            # обращения к LLM (см. require_market_match ниже) — общие ленты
+            # вроде TechCrunch/CNews несут много статей мимо темы, и каждая
+            # отправленная в analyze_signals.py статья — это платный вызов
+            # Claude API. Экономит деньги ценой риска пропустить сигнал,
+            # сформулированный необычными словами, мимо списка keywords в
+            # config/parameters.yaml -> markets. Отключается одной строкой
+            # в конфиге, если важнее не упустить ничего.
+            if require_market_match and market_guess == "Не определено":
+                continue
+
             item = {
                 "source_name": src["name"],
                 "group": src.get("group"),
@@ -88,11 +105,10 @@ def fetch(mode="weekly", start=None, end=None):
                 "published": pub_dt.date().isoformat() if pub_dt else "",
                 "title": title,
                 "snippet": summary[:600],
-                "market_guess": tag_market(f"{title} {summary}", cfg["markets"]),
+                "market_guess": market_guess,
                 "in_target_window": in_window(pub_dt, start, end),
             }
             new_items.append(item)
-            known_urls.add(url)
 
     OUT_PATH.write_text(json.dumps(new_items, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Найдено новых сигналов: {len(new_items)} -> {OUT_PATH}")

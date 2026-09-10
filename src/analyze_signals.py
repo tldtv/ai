@@ -79,7 +79,12 @@ def call_llm(client, model, item, weights):
     )
     resp = client.messages.create(
         model=model,
-        max_tokens=800,
+        max_tokens=700,  # снижено с 800 — небольшая, безопасная экономия;
+        # русскоязычный JSON-ответ по этой схеме на практике укладывается
+        # заметно ниже потолка, но текстовые поля (fact/interpretation/
+        # opportunity_hypothesis) свободной длины, поэтому не опускаем
+        # сильно ниже — риск обрезать ответ и сломать JSON стоит дороже
+        # сэкономленного
         messages=[{"role": "user", "content": prompt}],
     )
     text = resp.content[0].text.strip()
