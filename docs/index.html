@@ -1918,9 +1918,17 @@
       recomputeAll();
       return;
     }
-    const update = { updated_at: firebase.firestore.FieldValue.serverTimestamp() };
-    update['overrides.' + k] = v;
-    db.collection('signal_overrides').doc(card.dataset.fid).set(update, { merge: true })
+    // Настоящий вложенный объект, а не строка с точкой в ключе:
+    // set(..., {merge:true}) сам рекурсивно сливает вложенные map-поля
+    // Firestore, обновляя только overrides.<k> и не трогая остальные
+    // критерии в overrides — то, ради чего изначально была нужна точечная
+    // запись, но по-настоящему рабочим способом (строковый ключ с точкой
+    // вида 'overrides.strategic_fit' в set() трактуется как ОДНО поле с
+    // точкой в имени, а не как путь — так работает только в update()).
+    db.collection('signal_overrides').doc(card.dataset.fid).set({
+      overrides: { [k]: v },
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
       .catch(err => console.error('Не удалось сохранить ручную оценку:', err));
   });
 
