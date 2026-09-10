@@ -212,7 +212,7 @@ TEMPLATE = """<!doctype html>
   .breakdown li:first-child{{border-top:none;}}
   .breakdown .val{{font-weight:700;color:var(--ink);display:flex;align-items:center;gap:4px;}}
   .breakdown li.overridden{{background:var(--accent-soft);border-radius:6px;}}
-  .breakdown li.overridden .override-flag{{font-size:9.5px;font-weight:600;color:var(--accent);}}
+  .breakdown li.overridden .override-flag{{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;line-height:1;flex-shrink:0;}}
   .crit-input{{width:36px;font:inherit;font-size:12px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;padding:2px 3px;background:var(--surface);color:var(--ink);}}
   .crit-input:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
 
@@ -220,8 +220,9 @@ TEMPLATE = """<!doctype html>
   .vote-row[hidden]{{display:none;}}
   .vote-btn{{font:inherit;font-size:10.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
   .vote-btn.voted{{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600;}}
-  .vote-row.locked .vote-btn:not(.voted){{opacity:.55;}}
   .vote-btn:disabled{{cursor:not-allowed;}}
+  .vote-hint{{font-size:10.5px;color:var(--ink-soft);margin:4px 0 0;line-height:1.4;}}
+  .vote-hint[hidden]{{display:none;}}
 
   .comments{{margin-top:8px;}}
   .comment-list{{display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:160px;overflow-y:auto;}}
@@ -459,7 +460,6 @@ TEMPLATE = """<!doctype html>
   let localVoteChoice = {{}};
   try {{ localVoteChoice = JSON.parse(localStorage.getItem(VOTE_KEY) || '{{}}'); }} catch (e) {{}}
   function persistVoteChoice() {{ try {{ localStorage.setItem(VOTE_KEY, JSON.stringify(localVoteChoice)); }} catch (e) {{}} }}
-  const votedLocally = new Set(Object.keys(localVoteChoice));
 
   function setCardColor(card, color) {{
     card.classList.remove('green', 'yellow', 'red', 'grey');
@@ -523,22 +523,37 @@ TEMPLATE = """<!doctype html>
     return 'red';
   }}
 
+  // Статус 2-го уровня считается заново при каждом изменении голосов —
+  // не «залипает» навсегда после первого достижения порога. Если
+  // распределение голосов меняется (кто-то переголосовал), сигнал может
+  // вернуться на 1-й уровень (ни один вариант больше не набирает порог)
+  // либо переехать в другую группу 2-го уровня. При равенстве голосов
+  // у нескольких вариантов приоритет: Очень интересно > Сомнительно, но
+  // окей > Отмели.
+  function computeLevel2Status(counts, votesToPromote) {{
+    const order = ['hot', 'maybe', 'out'];
+    let maxCount = 0;
+    order.forEach(k => {{ const c = counts[k] || 0; if (c > maxCount) maxCount = c; }});
+    if (maxCount < votesToPromote) return '';
+    return order.find(k => (counts[k] || 0) === maxCount);
+  }}
+
   function updateVoteUI(card, vote) {{
     const row = card.querySelector('[data-vote-row]');
     if (!row) return;
-    const counts = vote || {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
+    const counts = vote || {{ out: 0, maybe: 0, hot: 0 }};
     ['out', 'maybe', 'hot'].forEach(k => {{
       const span = row.querySelector(`[data-vote-count="${{k}}"]`);
       if (span) span.textContent = counts[k] || 0;
     }});
-    const promoted = !!counts.level2_status;
-    row.hidden = promoted;
     const fid = card.dataset.fid;
-    const myVote = votedLocally.has(fid);
-    row.classList.toggle('locked', myVote || promoted);
+    const myChoice = localVoteChoice[fid];
+    const hint = card.querySelector('[data-vote-hint]');
+    if (hint) hint.hidden = !myChoice;
     row.querySelectorAll('.vote-btn').forEach(btn => {{
-      btn.classList.toggle('voted', myVote && localVoteChoice[fid] === btn.dataset.vote);
-      btn.disabled = myVote || promoted;
+      const isMine = myChoice === btn.dataset.vote;
+      btn.classList.toggle('voted', isMine);
+      btn.disabled = isMine;
     }});
   }}
 
@@ -573,7 +588,8 @@ TEMPLATE = """<!doctype html>
       }}
 
       const vote = votesMap[card.dataset.fid];
-      const l2 = (vote && vote.level2_status) || '';
+      const counts = vote || {{ out: 0, maybe: 0, hot: 0 }};
+      const l2 = computeLevel2Status(counts, liveVotesToPromote);
       card.dataset.level2 = l2;
       const displayColor = l2 ? L2_COLOR[l2] : baseColor;
       setCardColor(card, displayColor);
@@ -592,38 +608,41 @@ TEMPLATE = """<!doctype html>
     }}
   }});
 
+  // Голос можно менять сколько угодно раз: клик по другому варианту снимает
+  // старый голос и добавляет новый — счётчики, а значит и группа 2-го
+  // уровня (см. computeLevel2Status выше), пересчитываются сразу у всех.
   function castVote(card, option) {{
     const fid = card.dataset.fid;
-    if (votedLocally.has(fid)) return;
+    const prevChoice = localVoteChoice[fid];
+    if (prevChoice === option) return; // уже выбран этот вариант
     if (!db) {{
-      const data = votesMap[fid] || {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
-      if (data.level2_status) return;
+      const data = votesMap[fid] || {{ out: 0, maybe: 0, hot: 0 }};
+      if (prevChoice) data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
       data[option] = (data[option] || 0) + 1;
-      if (!data.level2_status && data[option] >= liveVotesToPromote) {{
-        data.level2_status = option;
-      }}
       votesMap[fid] = data;
       persistVotesLocal();
       localVoteChoice[fid] = option;
       persistVoteChoice();
-      votedLocally.add(fid);
       recomputeAll();
       return;
     }}
     const ref = db.collection('signal_votes').doc(fid);
     db.runTransaction(tx => tx.get(ref).then(doc => {{
-      const data = doc.exists ? doc.data() : {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
-      if (data.level2_status) return;
+      const data = doc.exists ? doc.data() : {{ out: 0, maybe: 0, hot: 0 }};
+      if (prevChoice) data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
       data[option] = (data[option] || 0) + 1;
-      if (!data.level2_status && data[option] >= liveVotesToPromote) {{
-        data.level2_status = option;
-        data.promoted_at = firebase.firestore.FieldValue.serverTimestamp();
-      }}
-      tx.set(ref, data, {{ merge: true }});
+      // Только out/maybe/hot — ровно то, что разрешено правилами
+      // безопасности Firestore для signal_votes (см. firestore_rules_updated.txt
+      // в корне репозитория). level2_status/promoted_at там больше не нужны
+      // — статус считается на лету на клиенте (computeLevel2Status).
+      tx.set(ref, {{
+        out: data.out || 0,
+        maybe: data.maybe || 0,
+        hot: data.hot || 0,
+      }}, {{ merge: true }});
     }})).then(() => {{
       localVoteChoice[fid] = option;
       persistVoteChoice();
-      votedLocally.add(fid);
       updateVoteUI(card, votesMap[fid]);
     }}).catch(err => console.error('Не удалось проголосовать:', err));
   }}
@@ -1116,7 +1135,7 @@ def render_breakdown(row):
         f'{html.escape(CRITERIA_LABELS.get(k, k))}</span>'
         f'<span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" '
         f'value="{html.escape(str(v))}" data-orig="{html.escape(str(v))}" data-criterion="{html.escape(k)}">'
-        f'/5<span class="override-flag" hidden>изменено вручную</span></span></li>'
+        f'/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li>'
         for k, v in scores.items()
     )
     return f'<details class="card-collapse breakdown"><summary>Разбивка оценки (можно менять)</summary><ul>{items}</ul></details>'
@@ -1167,6 +1186,8 @@ def render_vote_row():
         '<button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button>'
         '<button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button>'
         '</div>'
+        '<p class="vote-hint" data-vote-hint hidden>Голос можно изменить в любой момент — сигнал может вернуться'
+        ' на 1-й уровень или перейти в другую группу 2-го уровня.</p>'
     )
 
 
