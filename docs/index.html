@@ -192,7 +192,7 @@
 <body>
   <h1>Точки роста — Авито.Работа
     <span class="refresh-wrap">
-      <a class="refresh-btn" id="refreshBtn" href="https://github.com/your-username/your-repo/actions/workflows/weekly_signal_scan.yml" target="_blank" rel="noopener">↻ Обновить</a>
+      <a class="refresh-btn" id="refreshBtn" href="https://github.com/tldtv/ai/actions/workflows/weekly_signal_scan.yml" target="_blank" rel="noopener">↻ Обновить</a>
       <span>Откроется страница Actions на GitHub — там нажмите «Run workflow», чтобы запустить обновление.</span>
       <button class="admin-btn" id="adminBtn" type="button" title="Настройки дашборда" aria-label="Настройки дашборда">⚙️</button>
     </span>
@@ -1684,7 +1684,8 @@
   window.DEFAULT_VOTES_TO_PROMOTE = 3;
   window.DEFAULT_CADENCE_DAYS = 7;
 </script>
-
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
   const state = { market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все' };
   const grid = document.getElementById('grid');
@@ -1698,7 +1699,7 @@
   // только локально в этом браузере, а голосование/комментарии/админ-панель
   // отключены с пояснением (это не то, что имеет смысл хранить только у
   // себя — весь смысл в том, чтобы видели все).
-  const FIREBASE_CONFIG = null;
+  const FIREBASE_CONFIG = {"apiKey": "AIzaSyA2e9RTnznpcBJ7ofwzYNE9OlNyphWXyvE", "authDomain": "avito-signal-agent.firebaseapp.com", "projectId": "avito-signal-agent", "storageBucket": "avito-signal-agent.firebasestorage.app", "messagingSenderId": "622646642971", "appId": "1:622646642971:web:d2fba93b2c4d3611182bbe"};
   const FIREBASE_ENABLED = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey);
   let db = null;
   if (FIREBASE_ENABLED) {
