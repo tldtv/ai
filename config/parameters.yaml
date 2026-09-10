@@ -39,10 +39,23 @@ dashboard:
   # Ориентир на фирменный фиолетовый Авито — точный HEX не подтверждён
   # официальным брендбуком на момент подготовки, при необходимости
   # замените на точное значение из вашей дизайн-системы.
-  github_repo: "your-username/your-repo"
+  github_repo: "tldtv/ai"
   # Для кнопки "Обновить" на дашборде — ведёт на страницу запуска workflow
   # в GitHub Actions. Укажите в формате username/repo (как в адресе вашего
   # репозитория на github.com).
+  firebase:
+    api_key: "AIzaSyA2e9RTnznpcBJ7ofwzYNE9OlNyphWXyvE"
+    auth_domain: "avito-signal-agent.firebaseapp.com"
+    project_id: "avito-signal-agent"
+    storage_bucket: "avito-signal-agent.firebasestorage.app"
+    messaging_sender_id: "622646642971"
+    app_id: "1:622646642971:web:d2fba93b2c4d3611182bbe"
+    # Публичный клиентский конфиг Firebase — ему и положено быть видимым
+    # в исходном коде страницы, это не секрет (защита — в Security Rules
+    # в консоли Firebase, не в сокрытии этих значений). Без этого блока
+    # (или если api_key пустой) дашборд не подключает Firebase вообще —
+    # "Отмели"/правки оценки работают только локально в браузере,
+    # а комментарии и админ-панель полностью отключены.
 
 # Веса критериев приоритизации. Меняя веса, вы не трогаете код —
 # модель получает актуальный список критериев при каждом запуске.
