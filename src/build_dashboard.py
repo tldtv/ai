@@ -252,6 +252,13 @@ TEMPLATE = """<!doctype html>
   .admin-row label{{font-size:12.5px;}}
   .admin-row input{{width:80px;font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);text-align:right;}}
   .admin-section-title{{font-size:11.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 2px;}}
+
+  .check-list{{display:flex;flex-wrap:wrap;gap:8px 16px;padding:6px 0 10px;}}
+  .check-list label{{display:flex;align-items:center;gap:6px;font-size:12.5px;cursor:pointer;}}
+  .tg-connect-btn{{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:999px;background:#229ED9;color:#fff;text-decoration:none;margin:4px 0 8px;}}
+  .tg-connect-btn:hover{{background:#1c86ba;}}
+  .sub-status{{font-size:11.5px;color:var(--ink-soft);margin:0 0 10px;}}
+  .sub-status.confirmed{{color:#1a9e5c;font-weight:600;}}
   .admin-actions{{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:18px;}}
   .admin-actions button{{font:inherit;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);cursor:pointer;}}
   .admin-actions .save{{border-color:var(--accent);background:var(--accent);color:#fff;}}
@@ -282,6 +289,7 @@ TEMPLATE = """<!doctype html>
       <a class="refresh-btn{refresh_disabled_class}" id="refreshBtn" href="{refresh_href}" target="_blank" rel="noopener">↻ Обновить</a>
       <span>{refresh_note}</span>
       <button class="admin-btn" id="adminBtn" type="button" title="Настройки дашборда" aria-label="Настройки дашборда">⚙️</button>
+      <button class="admin-btn" id="subscribeBtn" type="button" title="Подписаться на еженедельную рассылку сигналов" aria-label="Подписаться на рассылку">🔔</button>
     </span>
   </h1>
   <p class="sub">Бэклог сигналов · </p>
@@ -413,6 +421,58 @@ TEMPLATE = """<!doctype html>
     </div>
   </div>
 
+  <div class="admin-overlay" id="subscribeOverlay" hidden>
+    <div class="admin-modal">
+      <h2>Подписка на еженедельную рассылку</h2>
+      <p class="note">Раз в неделю, вместе с обновлением дашборда, на выбранный канал придёт список новых сигналов по вашим фильтрам. Подписка привязана к этому браузеру — как голоса и комментарии.</p>
+
+      <div class="admin-section-title">Куда отправлять</div>
+      <div class="tabs" id="subChannelTabs">
+        <button class="tab active" data-channel="email" type="button">📧 Email</button>
+        <button class="tab" data-channel="telegram" type="button">📨 Telegram</button>
+      </div>
+
+      <div id="subEmailBlock" style="margin-top:10px;">
+        <div class="admin-row"><label>Email</label><input type="email" id="subEmail" placeholder="you@example.com" style="width:220px;text-align:left;"></div>
+      </div>
+
+      <div id="subTelegramBlock" style="margin-top:10px;" hidden>
+        <p class="note">Telegram-боты не могут писать первыми — сначала нажмите «Подписаться» внизу, затем откройте бота и один раз нажмите «Start» в чате. Подписка подтвердится автоматически, обычно к моменту следующей рассылки.</p>
+        <div id="subTelegramConnectArea" hidden>
+          <a class="tg-connect-btn" id="subTelegramLink" href="#" target="_blank" rel="noopener">📨 Открыть бота и нажать Start</a>
+          <p class="sub-status" id="subTelegramStatus">Статус: не подтверждено</p>
+        </div>
+      </div>
+
+      <div class="admin-section-title">Рынок</div>
+      <div class="check-list" id="subMarkets">{sub_markets}</div>
+
+      <div class="admin-section-title">Группа источника</div>
+      <div class="check-list" id="subGroups">{sub_groups}</div>
+
+      <div class="admin-section-title">Приоритет</div>
+      <p class="note" style="margin:0 0 6px;">В рассылку попадают только новые сигналы 1-го уровня (то, что ещё не проголосовано командой) — выберите, каким светофором.</p>
+      <div class="check-list" id="subLevels">
+        <label><input type="checkbox" class="subLevelChk" value="green" checked> 🟢 Топ идея</label>
+        <label><input type="checkbox" class="subLevelChk" value="yellow" checked> 🟡 Внимательно изучить</label>
+        <label><input type="checkbox" class="subLevelChk" value="red" checked> 🔴 Посмотреть в полглаза</label>
+      </div>
+
+      <div class="admin-section-title">Дата публикации источника</div>
+      <div class="tabs" id="subRecency">
+        <button class="tab" data-days="7" type="button">За неделю</button>
+        <button class="tab active" data-days="30" type="button">За месяц</button>
+        <button class="tab" data-days="0" type="button">Без ограничения</button>
+      </div>
+
+      <div class="admin-actions">
+        <span class="admin-status" id="subStatus"></span>
+        <button type="button" id="subCancel">Закрыть</button>
+        <button type="button" class="save" id="subSave">Подписаться</button>
+      </div>
+    </div>
+  </div>
+
 <script>
   window.SIGNALS = {signals_json};
   window.CRITERIA_LABELS = {criteria_labels_json};
@@ -421,6 +481,7 @@ TEMPLATE = """<!doctype html>
   window.DEFAULT_THRESHOLDS = {thresholds_json};
   window.DEFAULT_VOTES_TO_PROMOTE = {votes_to_promote};
   window.DEFAULT_CADENCE_DAYS = {cadence_days};
+  window.TELEGRAM_BOT_USERNAME = {telegram_bot_username_json};
 </script>
 {firebase_scripts}
 <script>
@@ -1086,6 +1147,122 @@ TEMPLATE = """<!doctype html>
       .catch(err => {{ adminStatus.textContent = 'Ошибка сохранения.'; console.error(err); }});
   }});
 
+  // ---- Подписка на еженедельную рассылку ----
+  // Пишет документ в Firestore -> digest_subscriptions. Правила Firestore
+  // (firestore_rules.txt) разрешают отсюда только СОЗДАНИЕ подписки —
+  // читать, менять или удалять чужие подписки с клиента нельзя ни при
+  // каких условиях (это делает только src/send_digest.py через служебный
+  // Firebase-аккаунт в GitHub Actions). Отписка — не удаление документа
+  // (это тоже запрещено правилами), а разрешённое обновление ровно одного
+  // поля unsubscribed на true, см. checkUnsubscribeLink() ниже.
+  const subscribeBtn = document.getElementById('subscribeBtn');
+  const subscribeOverlay = document.getElementById('subscribeOverlay');
+  const subCancel = document.getElementById('subCancel');
+  const subSave = document.getElementById('subSave');
+  const subStatus = document.getElementById('subStatus');
+  const subEmailBlock = document.getElementById('subEmailBlock');
+  const subTelegramBlock = document.getElementById('subTelegramBlock');
+  const subTelegramConnectArea = document.getElementById('subTelegramConnectArea');
+  const subTelegramLink = document.getElementById('subTelegramLink');
+  const subTelegramStatus = document.getElementById('subTelegramStatus');
+  const subEmail = document.getElementById('subEmail');
+
+  subscribeBtn.addEventListener('click', () => {{
+    subStatus.textContent = '';
+    subStatus.classList.remove('confirmed');
+    subTelegramConnectArea.hidden = true;
+    subSave.disabled = false;
+    subscribeOverlay.hidden = false;
+  }});
+  subCancel.addEventListener('click', () => {{ subscribeOverlay.hidden = true; }});
+  subscribeOverlay.addEventListener('click', e => {{ if (e.target === subscribeOverlay) subscribeOverlay.hidden = true; }});
+
+  let subChannel = 'email';
+  document.getElementById('subChannelTabs').addEventListener('click', e => {{
+    if (!e.target.classList.contains('tab')) return;
+    subChannel = e.target.dataset.channel;
+    document.querySelectorAll('#subChannelTabs .tab').forEach(t => t.classList.toggle('active', t === e.target));
+    subEmailBlock.hidden = subChannel !== 'email';
+    subTelegramBlock.hidden = subChannel !== 'telegram';
+  }});
+
+  let subRecencyDays = 30;
+  document.getElementById('subRecency').addEventListener('click', e => {{
+    if (!e.target.classList.contains('tab')) return;
+    subRecencyDays = parseInt(e.target.dataset.days, 10);
+    document.querySelectorAll('#subRecency .tab').forEach(t => t.classList.toggle('active', t === e.target));
+  }});
+
+  subSave.addEventListener('click', () => {{
+    if (!db) {{
+      subStatus.textContent = 'Firebase не настроен на этом дашборде — подписка недоступна.';
+      subStatus.classList.remove('confirmed');
+      return;
+    }}
+    const email = subEmail.value.trim();
+    if (subChannel === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {{
+      subStatus.textContent = 'Укажите корректный email.';
+      subStatus.classList.remove('confirmed');
+      return;
+    }}
+    const markets = [...document.querySelectorAll('.subMarketChk:checked')].map(c => c.value);
+    const groups = [...document.querySelectorAll('.subGroupChk:checked')].map(c => c.value);
+    const colors = [...document.querySelectorAll('.subLevelChk:checked')].map(c => c.value);
+    const payload = {{
+      channel: subChannel,
+      markets, groups, colors,
+      recency_days: subRecencyDays,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }};
+    if (subChannel === 'email') payload.email = email;
+
+    subSave.disabled = true;
+    subStatus.classList.remove('confirmed');
+    subStatus.textContent = 'Сохраняем…';
+    const ref = db.collection('digest_subscriptions').doc();
+    ref.set(payload)
+      .then(() => {{
+        if (subChannel === 'telegram') {{
+          if (!window.TELEGRAM_BOT_USERNAME) {{
+            subStatus.textContent = 'Подписка сохранена, но у дашборда не задано имя Telegram-бота (config -> dashboard.telegram_bot_username) — попросите того, кто ведёт проект, дописать его.';
+            subSave.disabled = false;
+            return;
+          }}
+          const link = `https://t.me/${{window.TELEGRAM_BOT_USERNAME}}?start=${{ref.id}}`;
+          subTelegramLink.href = link;
+          subTelegramStatus.textContent = 'Статус: не подтверждено — нажмите кнопку выше и «Start» в чате.';
+          subTelegramConnectArea.hidden = false;
+          subStatus.textContent = '✅ Фильтры сохранены. Осталось открыть бота и нажать «Start».';
+          subStatus.classList.add('confirmed');
+          window.open(link, '_blank');
+        }} else {{
+          subStatus.textContent = '✅ Готово! Письмо придёт при ближайшей еженедельной рассылке, если найдутся сигналы под ваши фильтры.';
+          subStatus.classList.add('confirmed');
+        }}
+        subSave.disabled = false;
+      }})
+      .catch(err => {{
+        subStatus.textContent = 'Ошибка сохранения подписки.';
+        subStatus.classList.remove('confirmed');
+        subSave.disabled = false;
+        console.error(err);
+      }});
+  }});
+
+  // Отписка по ссылке из письма/telegram-сообщения (?unsub=<id подписки>).
+  // Правила Firestore разрешают клиенту только этот один вид записи —
+  // выставить unsubscribed=true в СВОЁМ ЖЕ документе, ничего больше
+  // прочитать или изменить в чужих подписках отсюда нельзя.
+  function checkUnsubscribeLink() {{
+    const params = new URLSearchParams(location.search);
+    const subId = params.get('unsub');
+    if (!subId || !db) return;
+    db.collection('digest_subscriptions').doc(subId).update({{ unsubscribed: true }})
+      .then(() => {{ alert('Вы отписаны от еженедельной рассылки сигналов.'); }})
+      .catch(err => {{ console.error('Не удалось отписать (возможно, ссылка уже использована):', err); }});
+  }}
+  checkUnsubscribeLink();
+
   // ---- Загрузка и подписки ----
   sortCards();
   if (db) {{
@@ -1517,6 +1694,18 @@ def build():
         for g, names in group_lookup.items()
     ) or "<p>Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
+    # Чекбоксы рынка/группы источника для формы подписки на рассылку —
+    # те же списки значений, что у фильтров-вкладок выше, но как чекбоксы
+    # (в рассылке можно выбрать сразу несколько, а не один активный).
+    sub_markets_html = "".join(
+        f'<label><input type="checkbox" class="subMarketChk" value="{html.escape(m)}" checked> {html.escape(m)}</label>'
+        for m in markets
+    ) or "<p class=\"note\">Рынки ещё не заданы в config/parameters.yaml -> markets</p>"
+    sub_groups_html = "".join(
+        f'<label><input type="checkbox" class="subGroupChk" value="{html.escape(g)}" checked> {html.escape(g)}</label>'
+        for g in group_values
+    ) or "<p class=\"note\">Источники ещё не заданы в config/parameters.yaml -> sources</p>"
+
     cards_html = "".join(
         render_card(r, c, i, group_lookup, group_descriptions, market_descriptions)
         for i, (r, c) in enumerate(zip(rows, colors))
@@ -1528,6 +1717,8 @@ def build():
     thresholds_json = json.dumps(
         {"green_min": thresholds["green_min"], "yellow_min": thresholds["yellow_min"]}, ensure_ascii=False
     )
+
+    telegram_bot_username_json = json.dumps(str(dash_cfg.get("telegram_bot_username", "") or ""), ensure_ascii=False)
 
     firebase_cfg = dash_cfg.get("firebase", {}) or {}
     firebase_enabled = bool(str(firebase_cfg.get("api_key", "")).strip())
@@ -1572,6 +1763,8 @@ def build():
             market_pop=market_pop_html,
             group_buttons=group_buttons_html,
             group_pop=group_pop_html,
+            sub_markets=sub_markets_html,
+            sub_groups=sub_groups_html,
             cards=cards_html,
             signals_json=signals_json,
             criteria_labels_json=criteria_labels_json,
@@ -1580,6 +1773,7 @@ def build():
             thresholds_json=thresholds_json,
             votes_to_promote=votes_to_promote,
             cadence_days=cadence_days,
+            telegram_bot_username_json=telegram_bot_username_json,
             refresh_href=refresh_href,
             refresh_disabled_class=refresh_disabled_class,
             refresh_note=refresh_note,

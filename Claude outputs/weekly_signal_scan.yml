@@ -46,6 +46,13 @@ jobs:
       - name: Build dashboard
         run: python src/build_dashboard.py
 
+      - name: Send weekly digest
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python src/send_digest.py
+
       - name: Commit updated backlog and dashboard
         run: |
           git config user.name "avito-signal-bot"

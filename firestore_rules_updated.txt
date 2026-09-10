@@ -42,5 +42,40 @@ service cloud.firestore {
         ['green_min', 'yellow_min', 'votes_to_promote', 'update_cadence_days', 'weights', 'updated_at']
       ) && request.resource.data.weights is map;
     }
+
+    // Подписки на еженедельную рассылку (форма подписки на дашборде,
+    // src/build_dashboard.py, и отправка — src/send_digest.py в GitHub
+    // Actions через служебный Firebase-аккаунт, у которого свой отдельный
+    // полный доступ через Admin SDK — правила ниже на него НЕ действуют,
+    // они только про то, что разрешено делать из обычного браузера).
+    //
+    // read: намеренно запрещено всем — иначе email/Telegram id подписчиков
+    // можно было бы прочитать через devtools прямо на странице дашборда.
+    // create: разрешено всем (это и есть форма подписки) — но только с
+    // ожидаемым набором полей и без служебных полей, которые должен
+    // выставлять только send_digest.py (telegram_chat_id, unsubscribed,
+    // last_digest_at).
+    // update: разрешено только одно конкретное действие — отписка по
+    // ссылке вида ?unsub=<id подписки> из письма/telegram-сообщения,
+    // то есть выставление unsubscribed=true и ничего больше (нельзя ни
+    // прочитать чужую подписку, ни поменять в ней что-то ещё, ни снова
+    // включить её ("отписаться" необратимо с клиента — новая подписка
+    // оформляется заново через форму)).
+    // delete: запрещено (не даёт правило ниже — delete отдельно не
+    // объявлен, поэтому Firestore по умолчанию его блокирует).
+    match /digest_subscriptions/{subId} {
+      allow read: if false;
+      allow create: if request.resource.data.keys().hasOnly(
+          ['channel', 'email', 'markets', 'groups', 'colors', 'recency_days', 'created_at']
+        )
+        && request.resource.data.channel in ['email', 'telegram']
+        && request.resource.data.markets is list
+        && request.resource.data.groups is list
+        && request.resource.data.colors is list
+        && request.resource.data.recency_days is int
+        && (request.resource.data.channel != 'email' || request.resource.data.email is string);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unsubscribed'])
+        && request.resource.data.unsubscribed == true;
+    }
   }
 }
