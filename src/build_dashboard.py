@@ -1,14 +1,28 @@
 """
 build_dashboard.py — читает data/backlog.csv и собирает docs/index.html:
-дашборд со сводной статистикой (светофор + статус «Отмели»), вкладками по
-рынкам с подсказкой о каждом рынке, фильтром по тиру источника (с
-подсказкой, какие источники в каком тире), фильтрами по диапазону оценки
-и по диапазону даты источника, сортировкой, разбивкой оценки по критериям
-с подсказками на каждой карточке, кнопкой «Отмели»/«Вернуть в цвет» и
-кнопкой перехода к ручному запуску обновления в GitHub Actions.
+дашборд со сводной статистикой по светофору, вкладками по рынкам с
+подсказкой о каждом рынке, фильтром по группе источника (с подсказкой),
+фильтрами по диапазону оценки и по диапазону даты источника, сортировкой,
+двумя сворачиваемыми блоками описания на карточке («Идея из новости» /
+«Применимость для Авито»), разбивкой оценки по критериям с подсказками и
+РУЧНЫМ редактированием каждой оценки (пересчёт итога и цвета — сразу),
+комментариями к сигналу, голосованием за перевод сигнала на 2-й уровень
+(Отмели / Сомнительно, но окей / Очень интересно), переключателем уровней,
+админ-панелью (пороги светофора, веса критериев, кол-во голосов для
+перехода на 2-й уровень, частота обновления) и кнопкой перехода к ручному
+запуску обновления в GitHub Actions.
 
-Пороги светофора и визуальные настройки — из config/parameters.yaml ->
-dashboard / traffic_light_thresholds / markets / sources.
+Всё, что должно быть общим для всех, кто открывает дашборд (ручные правки
+оценки, комментарии, голоса, настройки админ-панели), хранится в Firestore
+— см. config/parameters.yaml -> dashboard.firebase и README. Без
+настроенного Firebase эти функции либо отключены с пояснением (комментарии,
+админ-панель), либо (ручное редактирование оценки, голосование) работают
+только локально в этом браузере.
+
+Пороги светофора и визуальные настройки по умолчанию — из
+config/parameters.yaml -> dashboard / traffic_light_thresholds / markets /
+sources / priority_weights / votes_to_promote / update_cadence_days —
+дальше их можно перекрыть live через админ-панель на самой странице.
 
 docs/index.html обслуживается GitHub Pages (Settings -> Pages -> Deploy
 from a branch -> main -> /docs), поэтому после каждого пуша страница по
@@ -17,6 +31,7 @@ from a branch -> main -> /docs), поэтому после каждого пуш
 import csv
 import html
 import json
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -62,16 +77,6 @@ DEFAULT_MARKET_DESCRIPTIONS = {
     "HR-tech": "HR-tech — продукты HRmost и AIR: инструменты автоматизации найма и рекрутинга для бизнеса.",
 }
 
-# Названия и метки светофора. "grey" — не только сигналы без валидной
-# оценки, но и основной смысл цвета: идеи, вручную отправленные в "Отмели".
-STAT_META = [
-    ("total", "Все", "Всего идей", "", "total"),
-    ("green", "green", "Топ идея", "🟢", "green"),
-    ("yellow", "yellow", "Внимательно изучить", "🟡", "yellow"),
-    ("red", "red", "Посмотреть в полглаза", "🔴", "red"),
-    ("grey", "grey", "Отмели", "⚪", "grey"),
-]
-
 TEMPLATE = """<!doctype html>
 <html lang="ru">
 <head>
@@ -95,7 +100,7 @@ TEMPLATE = """<!doctype html>
   *{{box-sizing:border-box;}}
   body{{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}}
   h1{{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}}
-  .sub{{color:var(--ink-soft);font-size:13px;margin:0 0 22px;}}
+  .sub{{color:var(--ink-soft);font-size:13px;margin:0 0 18px;}}
 
   [data-tip]{{position:relative;cursor:help;}}
   [data-tip]:hover::after, [data-tip]:focus::after{{
@@ -121,8 +126,15 @@ TEMPLATE = """<!doctype html>
   .refresh-btn{{font:inherit;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);cursor:pointer;text-decoration:none;white-space:nowrap;}}
   .refresh-btn.disabled{{opacity:.55;cursor:not-allowed;border-color:var(--border);background:var(--grey-soft);color:var(--grey-ink);}}
   .refresh-wrap{{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}}
+  .admin-btn{{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);font-size:14px;cursor:pointer;line-height:1;}}
+  .admin-btn:hover{{border-color:var(--accent);color:var(--accent);}}
+
+  .level-switch{{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}}
+  .level-btn{{font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);cursor:pointer;}}
+  .level-btn.active{{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}}
 
   .stats{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;}}
+  .stats[hidden]{{display:none;}}
   .stat{{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;border-left:4px solid var(--grey);}}
   .stat .n{{display:block;font-size:22px;font-weight:700;line-height:1.1;}}
   .stat .l{{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;}}
@@ -164,13 +176,12 @@ TEMPLATE = """<!doctype html>
   .range-fill{{position:absolute;top:50%;height:4px;transform:translateY(-50%);background:var(--accent);border-radius:2px;}}
   .range-values{{font-size:12px;color:var(--ink-soft);white-space:nowrap;}}
 
-  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}}
+  .grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}}
   .card{{background:var(--surface);border:1px solid var(--border);border-left:5px solid var(--grey);border-radius:10px;padding:14px;transition:opacity .15s ease;}}
   .card.green{{border-left-color:var(--green);}}
   .card.yellow{{border-left-color:var(--yellow);}}
   .card.red{{border-left-color:var(--red);}}
   .card.grey{{border-left-color:var(--grey);}}
-  .card.shelved{{opacity:.65;}}
   .card.hidden{{display:none;}}
   .card-top{{display:flex;justify-content:space-between;align-items:center;gap:8px;}}
   .badges{{display:flex;gap:6px;flex-wrap:wrap;}}
@@ -182,27 +193,62 @@ TEMPLATE = """<!doctype html>
   .pill.grey{{background:var(--grey-soft);color:var(--grey-ink);}}
   .pill.market{{background:var(--accent-soft);color:var(--accent);}}
   .pill.status{{background:var(--grey-soft);color:var(--grey-ink);}}
-  .hyp{{font-size:13px;color:#444;margin:0 0 8px;}}
-  .meta{{font-size:11.5px;color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:0 0 6px;}}
-  .meta a{{color:var(--accent);}}
   .flag{{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}}
+  .misc-list{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:#444;}}
+  .misc-list li{{position:relative;padding:3px 0 3px 14px;line-height:1.5;}}
+  .misc-list li::before{{content:"•";position:absolute;left:0;color:var(--accent);}}
+  .misc-list a{{color:var(--accent);}}
   .empty{{color:#999;font-size:13px;grid-column:1/-1;}}
 
-  .breakdown{{margin-top:6px;}}
-  .breakdown summary{{font-size:12px;color:var(--accent);cursor:pointer;list-style:none;}}
-  .breakdown summary::-webkit-details-marker{{display:none;}}
-  .breakdown summary::before{{content:"▸ ";}}
-  .breakdown[open] summary::before{{content:"▾ ";}}
-  .breakdown ul{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}}
-  .breakdown li{{display:flex;justify-content:space-between;padding:3px 0;border-top:1px dashed var(--border);}}
-  .breakdown li:first-child{{border-top:none;}}
-  .breakdown .val{{font-weight:700;color:var(--ink);}}
+  .card-collapse{{margin-top:6px;}}
+  .card-collapse summary{{font-size:12px;color:var(--accent);cursor:pointer;list-style:none;}}
+  .card-collapse summary::-webkit-details-marker{{display:none;}}
+  .card-collapse summary::before{{content:"▸ ";}}
+  .card-collapse[open] summary::before{{content:"▾ ";}}
+  .card-collapse .body{{margin:8px 0 0;font-size:12.5px;color:#444;line-height:1.5;}}
 
-  .card-actions{{margin-top:10px;display:flex;gap:8px;}}
-  .shelve-btn, .restore-btn{{font:inherit;font-size:11.5px;padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
-  .shelve-btn:hover, .restore-btn:hover{{border-color:var(--accent);color:var(--accent);}}
-  .card:not(.shelved) .restore-btn{{display:none;}}
-  .card.shelved .shelve-btn{{display:none;}}
+  .breakdown ul{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}}
+  .breakdown li{{display:flex;justify-content:space-between;align-items:center;padding:4px 2px;border-top:1px dashed var(--border);}}
+  .breakdown li:first-child{{border-top:none;}}
+  .breakdown .val{{font-weight:700;color:var(--ink);display:flex;align-items:center;gap:4px;}}
+  .breakdown li.overridden{{background:var(--accent-soft);border-radius:6px;}}
+  .breakdown li.overridden .override-flag{{font-size:9.5px;font-weight:600;color:var(--accent);}}
+  .crit-input{{width:36px;font:inherit;font-size:12px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;padding:2px 3px;background:var(--surface);color:var(--ink);}}
+  .crit-input:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
+
+  .vote-row{{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;}}
+  .vote-row[hidden]{{display:none;}}
+  .vote-btn{{font:inherit;font-size:10.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
+  .vote-btn.voted{{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600;}}
+  .vote-row.locked .vote-btn:not(.voted){{opacity:.55;}}
+  .vote-btn:disabled{{cursor:not-allowed;}}
+
+  .comments{{margin-top:8px;}}
+  .comment-list{{display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:160px;overflow-y:auto;}}
+  .comment-item{{font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 9px;}}
+  .comment-item .t{{display:block;font-size:10px;color:var(--ink-soft);margin-top:2px;}}
+  .comment-form{{display:flex;gap:6px;}}
+  .comment-form[hidden]{{display:none;}}
+  .comment-form input{{flex:1;font:inherit;font-size:12px;padding:6px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}}
+  .comment-form button{{font:inherit;font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;border:none;background:var(--accent);color:#fff;cursor:pointer;}}
+  .disabled-note{{font-size:11px;color:var(--ink-soft);font-style:italic;margin:6px 0 0;}}
+
+
+  .admin-overlay{{position:fixed;inset:0;background:rgba(20,18,15,.4);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px;}}
+  .admin-overlay[hidden]{{display:none;}}
+  .admin-modal{{background:var(--surface);border-radius:14px;max-width:560px;width:100%;max-height:86vh;overflow-y:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.28);}}
+  .admin-modal h2{{font-size:16px;margin:0 0 6px;}}
+  .admin-modal .note{{font-size:11.5px;color:var(--ink-soft);margin:0 0 14px;line-height:1.5;}}
+  .admin-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px dashed var(--border);}}
+  .admin-row:first-of-type{{border-top:none;}}
+  .admin-row label{{font-size:12.5px;}}
+  .admin-row input{{width:80px;font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);text-align:right;}}
+  .admin-section-title{{font-size:11.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 2px;}}
+  .admin-actions{{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:18px;}}
+  .admin-actions button{{font:inherit;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);cursor:pointer;}}
+  .admin-actions .save{{border-color:var(--accent);background:var(--accent);color:#fff;}}
+  .admin-actions .save:disabled{{opacity:.5;cursor:not-allowed;}}
+  .admin-status{{font-size:11.5px;color:var(--green-ink);}}
 
   .assistant-toggle{{position:fixed;right:20px;bottom:20px;z-index:20;background:var(--accent);color:#fff;border:none;border-radius:999px;padding:12px 18px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;}}
   .assistant-panel{{position:fixed;top:0;right:0;height:100vh;width:340px;max-width:92vw;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.08);transform:translateX(100%);transition:transform .22s ease;z-index:30;display:flex;flex-direction:column;}}
@@ -227,9 +273,15 @@ TEMPLATE = """<!doctype html>
     <span class="refresh-wrap">
       <a class="refresh-btn{refresh_disabled_class}" id="refreshBtn" href="{refresh_href}" target="_blank" rel="noopener">↻ Обновить</a>
       <span>{refresh_note}</span>
+      <button class="admin-btn" id="adminBtn" type="button" title="Настройки дашборда" aria-label="Настройки дашборда">⚙️</button>
     </span>
   </h1>
   <p class="sub">Бэклог сигналов · </p>
+
+  <div class="level-switch" id="levelSwitch">
+    <button class="level-btn active" data-level="1" type="button">Уровень 1 · Сырой список</button>
+    <button class="level-btn" data-level="2" type="button">Уровень 2 · После голосования (<span id="level2Count">0</span>)</button>
+  </div>
 
   <div class="stats" id="stats">
     <button class="stat total active" data-color="Все">
@@ -244,8 +296,20 @@ TEMPLATE = """<!doctype html>
     <button class="stat red" data-color="red">
       <span class="n" id="statRed">{red_count}</span><span class="l">🔴 Посмотреть в полглаза</span>
     </button>
-    <button class="stat grey" data-color="grey">
-      <span class="n" id="statGrey">{grey_count}</span><span class="l">⚪ Отмели</span>
+  </div>
+
+  <div class="stats" id="stats2" hidden>
+    <button class="stat total active" data-l2="Все">
+      <span class="n" id="statL2Total">0</span><span class="l">Всего на 2-м уровне</span>
+    </button>
+    <button class="stat grey" data-l2="out">
+      <span class="n" id="statL2Out">0</span><span class="l">⚪ Отмели</span>
+    </button>
+    <button class="stat yellow" data-l2="maybe">
+      <span class="n" id="statL2Maybe">0</span><span class="l">🤔 Сомнительно, но окей</span>
+    </button>
+    <button class="stat green" data-l2="hot">
+      <span class="n" id="statL2Hot">0</span><span class="l">🔥 Очень интересно</span>
     </button>
   </div>
 
@@ -318,22 +382,49 @@ TEMPLATE = """<!doctype html>
     </form>
   </aside>
 
+  <div class="admin-overlay" id="adminOverlay" hidden>
+    <div class="admin-modal">
+      <h2>Настройки дашборда</h2>
+      <p class="note">Открыто всем, у кого есть ссылка на дашборд — как и голосование. Изменения применяются сразу у всех, без нового запуска пайплайна, и хранятся в Firestore поверх значений по умолчанию из config/parameters.yaml.</p>
+      <div class="admin-section-title">Пороги светофора (шкала 1–5)</div>
+      <div class="admin-row"><label>«Топ идея» (зелёный), от</label><input type="number" id="cfgGreenMin" step="0.1" min="0" max="5"></div>
+      <div class="admin-row"><label>«Внимательно изучить» (жёлтый), от</label><input type="number" id="cfgYellowMin" step="0.1" min="0" max="5"></div>
+      <div class="admin-section-title">Голосование и обновления</div>
+      <div class="admin-row"><label>Голосов для перехода на 2-й уровень (свой счётчик у каждого варианта)</label><input type="number" id="cfgVotesToPromote" step="1" min="1" max="50"></div>
+      <div class="admin-row"><label>Частота обновления дашборда, дней</label><input type="number" id="cfgCadence" step="1" min="1" max="90"></div>
+      <p class="note">Частота обновления — справочное значение для команды. Реальное расписание запусков задаётся в .github/workflows/weekly_signal_scan.yml — изменение этого поля само по себе cron не меняет.</p>
+      <div class="admin-section-title">Веса критериев в итоговой оценке</div>
+      <div id="cfgWeights"></div>
+      <div class="admin-actions">
+        <span class="admin-status" id="adminStatus"></span>
+        <button type="button" id="adminCancel">Закрыть</button>
+        <button type="button" class="save" id="adminSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
 <script>
   window.SIGNALS = {signals_json};
   window.CRITERIA_LABELS = {criteria_labels_json};
+  window.DEFAULT_WEIGHTS = {weights_json};
+  window.DEFAULT_THRESHOLDS = {thresholds_json};
+  window.DEFAULT_VOTES_TO_PROMOTE = {votes_to_promote};
+  window.DEFAULT_CADENCE_DAYS = {cadence_days};
 </script>
 {firebase_scripts}
 <script>
-  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '' }};
+  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все' }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
+  const L2_COLOR = {{ out: 'grey', maybe: 'yellow', hot: 'green' }};
 
-  // ---- Отмели / вернуть в цвет ----
   // Если в config/parameters.yaml -> dashboard.firebase заполнены ключи —
-  // состояние "Отмели" общее для всех, хранится в Firestore и обновляется
-  // у всех открытых вкладок практически сразу (см. README). Если нет —
-  // используется localStorage этого браузера как раньше: отметка видна
-  // только на этом устройстве, не синхронизируется между коллегами.
+  // «Отмели», ручные правки оценки, комментарии, голосование и админ-панель
+  // общие для всех, кто открывает дашборд (Firestore, обновление почти
+  // мгновенное). Если нет — «Отмели» и ручные правки оценки работают
+  // только локально в этом браузере, а голосование/комментарии/админ-панель
+  // отключены с пояснением (это не то, что имеет смысл хранить только у
+  // себя — весь смысл в том, чтобы видели все).
   const FIREBASE_CONFIG = {firebase_config_json};
   const FIREBASE_ENABLED = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey);
   let db = null;
@@ -342,7 +433,7 @@ TEMPLATE = """<!doctype html>
       firebase.initializeApp(FIREBASE_CONFIG);
       db = firebase.firestore();
     }} catch (e) {{
-      console.error('Firebase не инициализировался — "Отмели" будет работать только локально в этом браузере:', e);
+      console.error('Firebase не инициализировался — общие функции будут отключены/локальны:', e);
       db = null;
     }}
   }}
@@ -364,14 +455,11 @@ TEMPLATE = """<!doctype html>
   }}
   cards().forEach(c => {{ c.dataset.fid = hashKey(c.dataset.key); }});
 
-  const SHELF_KEY = 'avitoShelvedIdeas';
-  let shelved = new Set();
-  try {{
-    shelved = new Set(JSON.parse(localStorage.getItem(SHELF_KEY) || '[]'));
-  }} catch (e) {{ /* localStorage недоступен (приватный режим и т.п.) — просто не сохраняем между визитами */ }}
-  function persistShelved() {{
-    try {{ localStorage.setItem(SHELF_KEY, JSON.stringify([...shelved])); }} catch (e) {{}}
-  }}
+  const VOTE_KEY = 'avitoVoteChoices';
+  let localVoteChoice = {{}};
+  try {{ localVoteChoice = JSON.parse(localStorage.getItem(VOTE_KEY) || '{{}}'); }} catch (e) {{}}
+  function persistVoteChoice() {{ try {{ localStorage.setItem(VOTE_KEY, JSON.stringify(localVoteChoice)); }} catch (e) {{}} }}
+  const votedLocally = new Set(Object.keys(localVoteChoice));
 
   function setCardColor(card, color) {{
     card.classList.remove('green', 'yellow', 'red', 'grey');
@@ -384,70 +472,198 @@ TEMPLATE = """<!doctype html>
     }}
   }}
 
-  function hydrateShelved() {{
-    cards().forEach(c => {{
-      if (shelved.has(c.dataset.key)) {{
-        c.classList.add('shelved');
-        setCardColor(c, 'grey');
-      }}
-    }});
-  }}
-
   function recomputeStats() {{
-    const counts = {{ green: 0, yellow: 0, red: 0, grey: 0 }};
-    cards().forEach(c => {{ counts[c.dataset.color] = (counts[c.dataset.color] || 0) + 1; }});
+    const counts = {{ green: 0, yellow: 0, red: 0 }};
+    cards().forEach(c => {{ if (!c.dataset.level2) counts[c.dataset.color] = (counts[c.dataset.color] || 0) + 1; }});
     document.getElementById('statGreen').textContent = counts.green;
     document.getElementById('statYellow').textContent = counts.yellow;
     document.getElementById('statRed').textContent = counts.red;
-    document.getElementById('statGrey').textContent = counts.grey;
+  }}
+
+  function applyLevel2Stats() {{
+    const counts = {{ out: 0, maybe: 0, hot: 0 }};
+    let total = 0;
+    cards().forEach(c => {{ if (c.dataset.level2) {{ counts[c.dataset.level2] = (counts[c.dataset.level2] || 0) + 1; total++; }} }});
+    document.getElementById('statL2Total').textContent = total;
+    document.getElementById('statL2Out').textContent = counts.out;
+    document.getElementById('statL2Maybe').textContent = counts.maybe;
+    document.getElementById('statL2Hot').textContent = counts.hot;
+    document.getElementById('level2Count').textContent = total;
+  }}
+
+  // ---- Живой пересчёт: веса/пороги (админ-панель) + ручные правки оценки
+  // (signal_overrides) + статус 2-го уровня (signal_votes) все вместе
+  // определяют итоговый показанный цвет/оценку карточки. Пересчитывается
+  // при любом изменении любого из трёх источников.
+  let liveWeights = {{...window.DEFAULT_WEIGHTS}};
+  let liveThresholds = {{...window.DEFAULT_THRESHOLDS}};
+  let liveVotesToPromote = window.DEFAULT_VOTES_TO_PROMOTE;
+  let liveCadenceDays = window.DEFAULT_CADENCE_DAYS;
+  // Локальные версии ручных оценок и голосов — используются, когда
+  // Firebase не настроен: работает без бэкенда, просто не видно другим.
+  const OVERRIDE_KEY = 'avitoLocalOverrides';
+  const LOCAL_VOTES_KEY = 'avitoLocalVotes';
+  let overridesMap = {{}};
+  let votesMap = {{}};
+  try {{ overridesMap = JSON.parse(localStorage.getItem(OVERRIDE_KEY) || '{{}}'); }} catch (e) {{}}
+  try {{ votesMap = JSON.parse(localStorage.getItem(LOCAL_VOTES_KEY) || '{{}}'); }} catch (e) {{}}
+  function persistOverridesLocal() {{ try {{ localStorage.setItem(OVERRIDE_KEY, JSON.stringify(overridesMap)); }} catch (e) {{}} }}
+  function persistVotesLocal() {{ try {{ localStorage.setItem(LOCAL_VOTES_KEY, JSON.stringify(votesMap)); }} catch (e) {{}} }}
+
+  function computeScore(criteria, weights) {{
+    const keys = Object.keys(weights);
+    const totalW = keys.reduce((s, k) => s + (parseFloat(weights[k]) || 0), 0) || 1;
+    const total = keys.reduce((s, k) => s + (parseFloat(criteria[k]) || 0) * (parseFloat(weights[k]) || 0), 0);
+    return Math.round((total / totalW) * 10) / 10;
+  }}
+  function colorFor(score, thresholds) {{
+    if (isNaN(score)) return 'grey';
+    if (score >= thresholds.green_min) return 'green';
+    if (score >= thresholds.yellow_min) return 'yellow';
+    return 'red';
+  }}
+
+  function updateVoteUI(card, vote) {{
+    const row = card.querySelector('[data-vote-row]');
+    if (!row) return;
+    const counts = vote || {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
+    ['out', 'maybe', 'hot'].forEach(k => {{
+      const span = row.querySelector(`[data-vote-count="${{k}}"]`);
+      if (span) span.textContent = counts[k] || 0;
+    }});
+    const promoted = !!counts.level2_status;
+    row.hidden = promoted;
+    const fid = card.dataset.fid;
+    const myVote = votedLocally.has(fid);
+    row.classList.toggle('locked', myVote || promoted);
+    row.querySelectorAll('.vote-btn').forEach(btn => {{
+      btn.classList.toggle('voted', myVote && localVoteChoice[fid] === btn.dataset.vote);
+      btn.disabled = myVote || promoted;
+    }});
+  }}
+
+  function recomputeAll() {{
+    cards().forEach(card => {{
+      const idx = parseInt(card.dataset.idx, 10);
+      const signal = window.SIGNALS[idx] || {{}};
+      const criteriaBase = signal.criteria_scores || {{}};
+      const overrides = overridesMap[card.dataset.fid] || {{}};
+      const merged = {{...criteriaBase, ...overrides}};
+
+      card.querySelectorAll('.crit-input').forEach(inp => {{
+        const k = inp.dataset.criterion;
+        const hasOverride = Object.prototype.hasOwnProperty.call(overrides, k);
+        const v = hasOverride ? overrides[k] : (criteriaBase[k] !== undefined ? criteriaBase[k] : inp.dataset.orig);
+        if (document.activeElement !== inp) inp.value = v;
+        const row = inp.closest('.crit-row');
+        if (row) {{
+          row.classList.toggle('overridden', hasOverride);
+          const flag = row.querySelector('.override-flag');
+          if (flag) flag.hidden = !hasOverride;
+        }}
+      }});
+
+      let baseColor = card.dataset.bakedColor;
+      if (Object.keys(criteriaBase).length) {{
+        const score = computeScore(merged, liveWeights);
+        baseColor = colorFor(score, liveThresholds);
+        card.dataset.score = score;
+        const scorePill = card.querySelector('.card-top .pill:first-child');
+        if (scorePill) scorePill.textContent = score.toFixed(1);
+      }}
+
+      const vote = votesMap[card.dataset.fid];
+      const l2 = (vote && vote.level2_status) || '';
+      card.dataset.level2 = l2;
+      const displayColor = l2 ? L2_COLOR[l2] : baseColor;
+      setCardColor(card, displayColor);
+      updateVoteUI(card, vote);
+    }});
+    recomputeStats();
+    applyLevel2Stats();
+    apply();
   }}
 
   grid.addEventListener('click', e => {{
-    const shelveBtn = e.target.closest('.shelve-btn');
-    if (shelveBtn) {{
-      const card = shelveBtn.closest('.card');
-      if (db) {{
-        db.collection('shelved_ideas').doc(card.dataset.fid).set({{
-          shelved: true, key: card.dataset.key, updated: firebase.firestore.FieldValue.serverTimestamp(),
-        }}).catch(err => console.error('Не удалось записать "Отмели" в Firestore:', err));
-      }} else {{
-        shelved.add(card.dataset.key);
-        persistShelved();
-        card.classList.add('shelved');
-        setCardColor(card, 'grey');
-        recomputeStats();
-        apply();
+    const voteBtn = e.target.closest('.vote-btn');
+    if (voteBtn && !voteBtn.disabled) {{
+      const card = voteBtn.closest('.card');
+      castVote(card, voteBtn.dataset.vote);
+    }}
+  }});
+
+  function castVote(card, option) {{
+    const fid = card.dataset.fid;
+    if (votedLocally.has(fid)) return;
+    if (!db) {{
+      const data = votesMap[fid] || {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
+      if (data.level2_status) return;
+      data[option] = (data[option] || 0) + 1;
+      if (!data.level2_status && data[option] >= liveVotesToPromote) {{
+        data.level2_status = option;
       }}
+      votesMap[fid] = data;
+      persistVotesLocal();
+      localVoteChoice[fid] = option;
+      persistVoteChoice();
+      votedLocally.add(fid);
+      recomputeAll();
       return;
     }}
-    const restoreBtn = e.target.closest('.restore-btn');
-    if (restoreBtn) {{
-      const card = restoreBtn.closest('.card');
-      if (db) {{
-        db.collection('shelved_ideas').doc(card.dataset.fid).delete()
-          .catch(err => console.error('Не удалось убрать "Отмели" в Firestore:', err));
-      }} else {{
-        shelved.delete(card.dataset.key);
-        persistShelved();
-        card.classList.remove('shelved');
-        setCardColor(card, card.dataset.origColor);
-        recomputeStats();
-        apply();
+    const ref = db.collection('signal_votes').doc(fid);
+    db.runTransaction(tx => tx.get(ref).then(doc => {{
+      const data = doc.exists ? doc.data() : {{ out: 0, maybe: 0, hot: 0, level2_status: '' }};
+      if (data.level2_status) return;
+      data[option] = (data[option] || 0) + 1;
+      if (!data.level2_status && data[option] >= liveVotesToPromote) {{
+        data.level2_status = option;
+        data.promoted_at = firebase.firestore.FieldValue.serverTimestamp();
       }}
+      tx.set(ref, data, {{ merge: true }});
+    }})).then(() => {{
+      localVoteChoice[fid] = option;
+      persistVoteChoice();
+      votedLocally.add(fid);
+      updateVoteUI(card, votesMap[fid]);
+    }}).catch(err => console.error('Не удалось проголосовать:', err));
+  }}
+
+  grid.addEventListener('change', e => {{
+    const inp = e.target.closest('.crit-input');
+    if (!inp) return;
+    const card = inp.closest('.card');
+    const k = inp.dataset.criterion;
+    let v = parseFloat(inp.value);
+    if (isNaN(v)) v = parseFloat(inp.dataset.orig);
+    v = Math.min(5, Math.max(1, Math.round(v)));
+    inp.value = v;
+    if (!db) {{
+      overridesMap[card.dataset.fid] = overridesMap[card.dataset.fid] || {{}};
+      overridesMap[card.dataset.fid][k] = v;
+      persistOverridesLocal();
+      recomputeAll();
+      return;
     }}
+    const update = {{ updated_at: firebase.firestore.FieldValue.serverTimestamp() }};
+    update['overrides.' + k] = v;
+    db.collection('signal_overrides').doc(card.dataset.fid).set(update, {{ merge: true }})
+      .catch(err => console.error('Не удалось сохранить ручную оценку:', err));
   }});
 
   function apply() {{
     let visible = 0;
     cards().forEach(c => {{
+      const isPromoted = !!c.dataset.level2;
+      const levelMatch = state.level === 1 ? !isPromoted : isPromoted;
+      const l2Match = state.level !== 2 || state.l2 === 'Все' || c.dataset.level2 === state.l2;
       const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
-      const matchColor = state.color === 'Все' || c.dataset.color === state.color;
+      const matchColor = state.level !== 1 || state.color === 'Все' || c.dataset.color === state.color;
       const matchGroup = state.group === 'Все' || c.dataset.group === state.group;
       const score = parseFloat(c.dataset.score);
       const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
       const d = c.dataset.date || '';
       const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
-      const show = matchMarket && matchColor && matchGroup && matchScore && matchDate;
+      const show = levelMatch && l2Match && matchMarket && matchColor && matchGroup && matchScore && matchDate;
       c.classList.toggle('hidden', !show);
       if (show) visible++;
     }});
@@ -470,6 +686,24 @@ TEMPLATE = """<!doctype html>
     sorted.forEach(c => grid.appendChild(c));
   }}
 
+  document.getElementById('levelSwitch').addEventListener('click', e => {{
+    const btn = e.target.closest('.level-btn');
+    if (!btn) return;
+    state.level = parseInt(btn.dataset.level, 10);
+    document.querySelectorAll('.level-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('stats').hidden = state.level !== 1;
+    document.getElementById('stats2').hidden = state.level !== 2;
+    apply();
+  }});
+
+  document.getElementById('stats2').addEventListener('click', e => {{
+    const btn = e.target.closest('.stat');
+    if (!btn) return;
+    state.l2 = btn.dataset.l2;
+    document.querySelectorAll('#stats2 .stat').forEach(s => s.classList.toggle('active', s === btn));
+    apply();
+  }});
+
   document.getElementById('tabs').addEventListener('click', e => {{
     if (!e.target.classList.contains('tab')) return;
     state.market = e.target.dataset.market;
@@ -488,7 +722,7 @@ TEMPLATE = """<!doctype html>
     const btn = e.target.closest('.stat');
     if (!btn) return;
     state.color = btn.dataset.color;
-    document.querySelectorAll('.stat').forEach(s => s.classList.toggle('active', s === btn));
+    document.querySelectorAll('#stats .stat').forEach(s => s.classList.toggle('active', s === btn));
     apply();
   }});
 
@@ -555,37 +789,138 @@ TEMPLATE = """<!doctype html>
     refreshBtn.addEventListener('click', e => e.preventDefault());
   }}
 
-  sortCards();
-  recomputeStats();
-  apply();
-
-  if (db) {{
-    try {{
-      db.collection('shelved_ideas').onSnapshot(snap => {{
-        const ids = new Set();
-        snap.forEach(doc => ids.add(doc.id));
-        cards().forEach(c => {{
-          const isShelved = ids.has(c.dataset.fid);
-          c.classList.toggle('shelved', isShelved);
-          setCardColor(c, isShelved ? 'grey' : c.dataset.origColor);
-        }});
-        recomputeStats();
-        apply();
-      }}, err => {{
-        console.error('Firestore недоступен — "Отмели" работает только локально в этом браузере:', err);
-      }});
-    }} catch (e) {{
-      console.error('Не удалось подписаться на Firestore:', e);
-      db = null;
-      hydrateShelved();
-      recomputeStats();
-      apply();
+  // ---- Комментарии: подписка на подколлекцию только когда блок открыт
+  // (чтобы не открывать десятки слушателей Firestore сразу при загрузке) ----
+  const commentUnsubs = {{}};
+  document.querySelectorAll('.comments').forEach(det => {{
+    const card = det.closest('.card');
+    const fid = card.dataset.fid;
+    const list = det.querySelector('[data-comment-list]');
+    const form = det.querySelector('[data-comment-form]');
+    const inputEl = det.querySelector('[data-comment-input]');
+    const disabledNote = det.querySelector('[data-comment-disabled]');
+    if (!db) {{
+      form.hidden = true;
+      disabledNote.hidden = false;
+      return;
     }}
-  }} else {{
-    hydrateShelved();
-    recomputeStats();
-    apply();
+    det.addEventListener('toggle', () => {{
+      if (det.open && !commentUnsubs[fid]) {{
+        commentUnsubs[fid] = db.collection('signal_comments').doc(fid).collection('items')
+          .orderBy('created_at', 'asc')
+          .onSnapshot(snap => {{
+            list.innerHTML = '';
+            if (snap.empty) {{
+              list.innerHTML = '<p class="disabled-note">Комментариев пока нет.</p>';
+            }}
+            snap.forEach(doc => {{
+              const d = doc.data();
+              const when = (d.created_at && d.created_at.toDate) ? d.created_at.toDate().toLocaleString('ru-RU') : '';
+              const item = document.createElement('div');
+              item.className = 'comment-item';
+              item.textContent = d.text || '';
+              if (when) {{
+                const t = document.createElement('span');
+                t.className = 't';
+                t.textContent = when;
+                item.appendChild(t);
+              }}
+              list.appendChild(item);
+            }});
+          }}, err => console.error('Не удалось загрузить комментарии:', err));
+      }}
+    }});
+    form.addEventListener('submit', e => {{
+      e.preventDefault();
+      const text = inputEl.value.trim();
+      if (!text) return;
+      db.collection('signal_comments').doc(fid).collection('items').add({{
+        text, created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      }}).then(() => {{ inputEl.value = ''; }}).catch(err => console.error('Не удалось сохранить комментарий:', err));
+    }});
+  }});
+
+  // ---- Админ-панель ----
+  const adminBtn = document.getElementById('adminBtn');
+  const adminOverlay = document.getElementById('adminOverlay');
+  const adminCancel = document.getElementById('adminCancel');
+  const adminSave = document.getElementById('adminSave');
+  const adminStatus = document.getElementById('adminStatus');
+  const cfgWeightsWrap = document.getElementById('cfgWeights');
+
+  function fillAdminForm() {{
+    document.getElementById('cfgGreenMin').value = liveThresholds.green_min;
+    document.getElementById('cfgYellowMin').value = liveThresholds.yellow_min;
+    document.getElementById('cfgVotesToPromote').value = liveVotesToPromote;
+    document.getElementById('cfgCadence').value = liveCadenceDays;
+    cfgWeightsWrap.innerHTML = Object.keys(window.DEFAULT_WEIGHTS).map(k => `
+      <div class="admin-row">
+        <label>${{window.CRITERIA_LABELS[k] || k}}</label>
+        <input type="number" step="0.1" min="0" max="5" data-weight="${{k}}" value="${{liveWeights[k] !== undefined ? liveWeights[k] : window.DEFAULT_WEIGHTS[k]}}">
+      </div>`).join('');
   }}
+
+  adminBtn.addEventListener('click', () => {{ fillAdminForm(); adminStatus.textContent = ''; adminOverlay.hidden = false; }});
+  adminCancel.addEventListener('click', () => {{ adminOverlay.hidden = true; }});
+  adminOverlay.addEventListener('click', e => {{ if (e.target === adminOverlay) adminOverlay.hidden = true; }});
+
+  if (!db) {{
+    adminSave.disabled = true;
+    adminSave.title = 'Нужен настроенный Firebase, см. README';
+  }}
+
+  adminSave.addEventListener('click', () => {{
+    if (!db) return;
+    const weights = {{}};
+    cfgWeightsWrap.querySelectorAll('[data-weight]').forEach(inp => {{ weights[inp.dataset.weight] = parseFloat(inp.value) || 0; }});
+    const payload = {{
+      green_min: parseFloat(document.getElementById('cfgGreenMin').value),
+      yellow_min: parseFloat(document.getElementById('cfgYellowMin').value),
+      votes_to_promote: parseInt(document.getElementById('cfgVotesToPromote').value, 10) || window.DEFAULT_VOTES_TO_PROMOTE,
+      update_cadence_days: parseInt(document.getElementById('cfgCadence').value, 10) || window.DEFAULT_CADENCE_DAYS,
+      weights,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+    }};
+    if (isNaN(payload.green_min)) payload.green_min = window.DEFAULT_THRESHOLDS.green_min;
+    if (isNaN(payload.yellow_min)) payload.yellow_min = window.DEFAULT_THRESHOLDS.yellow_min;
+    db.collection('admin_config').doc('config').set(payload, {{ merge: true }})
+      .then(() => {{
+        adminStatus.textContent = 'Сохранено — применяется у всех.';
+        setTimeout(() => {{ adminOverlay.hidden = true; }}, 900);
+      }})
+      .catch(err => {{ adminStatus.textContent = 'Ошибка сохранения.'; console.error(err); }});
+  }});
+
+  // ---- Загрузка и подписки ----
+  sortCards();
+  if (db) {{
+    db.collection('signal_overrides').onSnapshot(snap => {{
+      const map = {{}};
+      snap.forEach(doc => {{ map[doc.id] = doc.data().overrides || {{}}; }});
+      overridesMap = map;
+      recomputeAll();
+    }}, err => console.error('Firestore (ручные оценки) недоступен:', err));
+
+    db.collection('signal_votes').onSnapshot(snap => {{
+      const map = {{}};
+      snap.forEach(doc => {{ map[doc.id] = doc.data(); }});
+      votesMap = map;
+      recomputeAll();
+    }}, err => console.error('Firestore (голосование) недоступен:', err));
+
+    db.collection('admin_config').doc('config').onSnapshot(doc => {{
+      const d = doc.exists ? doc.data() : {{}};
+      liveThresholds = {{
+        green_min: typeof d.green_min === 'number' ? d.green_min : window.DEFAULT_THRESHOLDS.green_min,
+        yellow_min: typeof d.yellow_min === 'number' ? d.yellow_min : window.DEFAULT_THRESHOLDS.yellow_min,
+      }};
+      liveWeights = (d.weights && Object.keys(d.weights).length) ? d.weights : {{...window.DEFAULT_WEIGHTS}};
+      liveVotesToPromote = typeof d.votes_to_promote === 'number' ? d.votes_to_promote : window.DEFAULT_VOTES_TO_PROMOTE;
+      liveCadenceDays = typeof d.update_cadence_days === 'number' ? d.update_cadence_days : window.DEFAULT_CADENCE_DAYS;
+      recomputeAll();
+    }}, err => console.error('Firestore (настройки) недоступен:', err));
+  }}
+  recomputeAll();
 
   // ---- Помощник по дашборду: локальная логика, без внешних вызовов ----
   const panel = document.getElementById('assistantPanel');
@@ -739,6 +1074,26 @@ def traffic_light(score_str, thresholds):
     return "red"
 
 
+def render_new_tip(row):
+    """Тултип для тега статуса 'new': сколько дней назад сигнал был
+    найден (date_found), с реальным числом вместо X. Считается на момент
+    сборки дашборда — обновится при следующем запуске пайплайна."""
+    raw = (row.get("date_found") or "").strip()
+    if not raw:
+        return ""
+    try:
+        found = date.fromisoformat(raw)
+    except ValueError:
+        return ""
+    days_ago = (date.today() - found).days
+    if days_ago <= 0:
+        return f"Сигнал найден сегодня ({raw})"
+    unit = "день" if days_ago % 10 == 1 and days_ago % 100 != 11 else (
+        "дня" if 2 <= days_ago % 10 <= 4 and not 12 <= days_ago % 100 <= 14 else "дней"
+    )
+    return f"Сигнал найден {days_ago} {unit} назад ({raw})"
+
+
 def render_breakdown(row):
     raw = row.get("criteria_scores") or ""
     try:
@@ -748,15 +1103,66 @@ def render_breakdown(row):
     if not scores:
         return ""
     items = "".join(
-        f'<li><span class="crit-name" tabindex="0" data-tip="{html.escape(CRITERIA_DESCRIPTIONS.get(k, ""))}">'
+        f'<li class="crit-row" data-criterion="{html.escape(k)}">'
+        f'<span class="crit-name" tabindex="0" data-tip="{html.escape(CRITERIA_DESCRIPTIONS.get(k, ""))}">'
         f'{html.escape(CRITERIA_LABELS.get(k, k))}</span>'
-        f'<span class="val">{html.escape(str(v))}/5</span></li>'
+        f'<span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" '
+        f'value="{html.escape(str(v))}" data-orig="{html.escape(str(v))}" data-criterion="{html.escape(k)}">'
+        f'/5<span class="override-flag" hidden>изменено вручную</span></span></li>'
         for k, v in scores.items()
     )
-    return f'<details class="breakdown"><summary>Разбивка оценки</summary><ul>{items}</ul></details>'
+    return f'<details class="card-collapse breakdown"><summary>Разбивка оценки (можно менять)</summary><ul>{items}</ul></details>'
 
 
-def render_card(row, color, group_lookup, group_descriptions, market_descriptions):
+def render_description_blocks(row):
+    fact = (row.get("fact") or "").strip()
+    interp = (row.get("interpretation") or "").strip()
+    news_body = " ".join(p for p in (fact, interp) if p) or "—"
+    avito_body = (row.get("opportunity_hypothesis") or "").strip() or "—"
+    return (
+        f'<details class="card-collapse"><summary>Идея из новости</summary>'
+        f'<p class="body">{html.escape(news_body)}</p></details>'
+        f'<details class="card-collapse" open><summary>Применимость для Авито</summary>'
+        f'<p class="body">{html.escape(avito_body)}</p></details>'
+    )
+
+
+def render_misc_block(row, confidence, window_flag):
+    items = [f'<li><a href="{html.escape(row.get("source_url",""))}" target="_blank" rel="noopener">Источник</a></li>']
+    items.append(f'<li>Дата источника: {html.escape(row.get("source_date","") or "—")}</li>')
+    items.append(f'<li>Уверенность: {html.escape(confidence)}</li>')
+    if window_flag:
+        items.append('<li><span class="flag">вне целевого окна</span></li>')
+    return (
+        '<details class="card-collapse misc"><summary>Прочее</summary>'
+        f'<ul class="misc-list">{"".join(items)}</ul></details>'
+    )
+
+
+def render_comments_block():
+    return (
+        '<details class="card-collapse comments"><summary>Комментарии</summary>'
+        '<div class="comment-list" data-comment-list></div>'
+        '<form class="comment-form" data-comment-form>'
+        '<input type="text" placeholder="Оставить комментарий…" maxlength="500" data-comment-input>'
+        '<button type="submit">Добавить</button>'
+        '</form>'
+        '<p class="disabled-note" data-comment-disabled hidden>Комментарии видны только при настроенном Firebase (см. README).</p>'
+        '</details>'
+    )
+
+
+def render_vote_row():
+    return (
+        '<div class="vote-row" data-vote-row>'
+        '<button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button>'
+        '<button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button>'
+        '<button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button>'
+        '</div>'
+    )
+
+
+def render_card(row, color, idx, group_lookup, group_descriptions, market_descriptions):
     market = row.get("market_guess", "") or "Не определено"
     cluster = row.get("cluster_id", "")
     status = row.get("status", "") or "new"
@@ -768,7 +1174,7 @@ def render_card(row, color, group_lookup, group_descriptions, market_description
     # заставлять вас вручную править уже накопленный backlog.csv.
     group = (row.get("source_tier") or "").strip()
     in_window = str(row.get("in_target_window", "")).strip().lower()
-    window_flag = '<span class="flag">вне целевого окна</span>' if in_window in ("false", "0", "нет") else ""
+    window_flag = in_window in ("false", "0", "нет")
 
     market_tip = html.escape(market_descriptions.get(market, ""))
     badges = f'<span class="pill market" tabindex="0" data-tip="{market_tip}">{html.escape(market)}</span>'
@@ -784,34 +1190,36 @@ def render_card(row, color, group_lookup, group_descriptions, market_description
     if cluster:
         badges += f'<span class="pill">кластер {html.escape(cluster)}</span>'
 
+    status_attrs = ""
+    if status == "new":
+        tip = render_new_tip(row)
+        if tip:
+            status_attrs = f' tabindex="0" data-tip="{html.escape(tip)}"'
+
     key = html.escape((row.get("source_url", "").strip() or row.get("title", "")) + "|" + row.get("title", ""))
+    has_breakdown = bool((row.get("criteria_scores") or "").strip())
 
     return f"""
-    <article class="card {color}" data-key="{key}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-group="{html.escape(group)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
+    <article class="card {color}" data-key="{key}" data-idx="{idx}" data-baked-color="{color}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-group="{html.escape(group)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
       <div class="card-top">
         <span class="pill {color}">{html.escape(str(score))}</span>
-        <span class="pill status">{html.escape(status)}</span>
+        <span class="pill status"{status_attrs}>{html.escape(status)}</span>
       </div>
       <h3>{html.escape(row.get('title',''))}</h3>
       <div class="badges">{badges}</div>
-      <p class="hyp">{html.escape(row.get('opportunity_hypothesis','') or '—')}</p>
-      <p class="meta">
-        <a href="{html.escape(row.get('source_url',''))}" target="_blank" rel="noopener">источник</a>
-        · {html.escape(row.get('source_date','') or '—')}
-        · уверенность: {html.escape(confidence)}
-        {window_flag}
-      </p>
-      {render_breakdown(row)}
-      <div class="card-actions">
-        <button class="shelve-btn" type="button">Отмели</button>
-        <button class="restore-btn" type="button">Вернуть в цвет</button>
-      </div>
+      {render_description_blocks(row)}
+      {render_misc_block(row, confidence, window_flag)}
+      {render_breakdown(row) if has_breakdown else ""}
+      {render_vote_row()}
+      {render_comments_block()}
     </article>"""
 
 
 def build_signals_json(rows, colors):
-    """Готовит компактный список сигналов для клиентского помощника —
-    те же данные, что уже на странице, просто в удобной для JS форме."""
+    """Готовит компактный список сигналов для клиентского помощника и для
+    живого пересчёта оценки/цвета (recomputeAll) — те же данные, что уже
+    на странице, просто в удобной для JS форме, в том же порядке, что и
+    карточки (индекс i соответствует data-idx карточки)."""
     signals = []
     for row, color in zip(rows, colors):
         raw = row.get("criteria_scores") or ""
@@ -872,6 +1280,9 @@ def build():
     title = dash_cfg.get("title", DEFAULT_TITLE)
     accent = dash_cfg.get("accent_color", DEFAULT_ACCENT)
     markets_cfg = cfg.get("markets", {})
+    weights_cfg = cfg.get("priority_weights", {}) or dict.fromkeys(CRITERIA_LABELS, 1.0)
+    votes_to_promote = int(cfg.get("votes_to_promote", 3) or 3)
+    cadence_days = int(cfg.get("update_cadence_days", 7) or 7)
 
     rows = load_rows()
     colors = [traffic_light(r.get("priority_score"), thresholds) for r in rows]
@@ -904,9 +1315,16 @@ def build():
         for g, names in group_lookup.items()
     ) or "<p>Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
-    cards_html = "".join(render_card(r, c, group_lookup, group_descriptions, market_descriptions) for r, c in zip(rows, colors)) or '<p class="empty">Пока нет сигналов</p>'
+    cards_html = "".join(
+        render_card(r, c, i, group_lookup, group_descriptions, market_descriptions)
+        for i, (r, c) in enumerate(zip(rows, colors))
+    ) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
     criteria_labels_json = json.dumps(CRITERIA_LABELS, ensure_ascii=False)
+    weights_json = json.dumps(weights_cfg, ensure_ascii=False)
+    thresholds_json = json.dumps(
+        {"green_min": thresholds["green_min"], "yellow_min": thresholds["yellow_min"]}, ensure_ascii=False
+    )
 
     firebase_cfg = dash_cfg.get("firebase", {}) or {}
     firebase_enabled = bool(str(firebase_cfg.get("api_key", "")).strip())
@@ -946,7 +1364,6 @@ def build():
             green_count=colors.count("green"),
             yellow_count=colors.count("yellow"),
             red_count=colors.count("red"),
-            grey_count=colors.count("grey"),
             tabs=tabs_html,
             market_pop=market_pop_html,
             group_buttons=group_buttons_html,
@@ -954,6 +1371,10 @@ def build():
             cards=cards_html,
             signals_json=signals_json,
             criteria_labels_json=criteria_labels_json,
+            weights_json=weights_json,
+            thresholds_json=thresholds_json,
+            votes_to_promote=votes_to_promote,
+            cadence_days=cadence_days,
             refresh_href=refresh_href,
             refresh_disabled_class=refresh_disabled_class,
             refresh_note=refresh_note,
