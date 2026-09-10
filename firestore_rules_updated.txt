@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ручные правки оценки по критериям (пересчёт итога — на клиенте)
+    match /signal_overrides/{fid} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['overrides', 'updated_at'])
+        && request.resource.data.overrides is map;
+    }
+
+    // Комментарии — подколлекция на сигнал. Создать может только анонимно
+    // вошедший (Authentication -> Sign-in method -> Anonymous), с полем
+    // author_uid, равным его собственному uid; удалить — только тот же
+    // author_uid, то есть каждый может удалить исключительно свои
+    // комментарии (проверяется здесь, на сервере, а не в интерфейсе).
+    match /signal_comments/{fid}/items/{itemId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['text', 'created_at', 'author_uid'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.author_uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.author_uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Голосование за переход на 2-й уровень
+    match /signal_votes/{fid} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['out', 'maybe', 'hot', 'level2_status', 'promoted_at'])
+        && request.resource.data.out is int
+        && request.resource.data.maybe is int
+        && request.resource.data.hot is int;
+    }
+
+    // Админ-панель — "живые" оверрайды порогов/весов/голосов/каденса
+    match /admin_config/config {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(
+        ['green_min', 'yellow_min', 'votes_to_promote', 'update_cadence_days', 'weights', 'updated_at']
+      ) && request.resource.data.weights is map;
+    }
+  }
+}

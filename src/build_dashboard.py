@@ -229,8 +229,11 @@ TEMPLATE = """<!doctype html>
 
   .comments{{margin-top:8px;}}
   .comment-list{{display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:160px;overflow-y:auto;}}
-  .comment-item{{font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 9px;}}
+  .comment-item{{position:relative;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 22px 6px 9px;}}
+  .comment-item .body{{display:block;white-space:pre-wrap;word-break:break-word;}}
   .comment-item .t{{display:block;font-size:10px;color:var(--ink-soft);margin-top:2px;}}
+  .comment-del{{position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;border:none;background:transparent;color:var(--ink-soft);font-size:10px;line-height:1;cursor:pointer;padding:0;}}
+  .comment-del:hover{{color:var(--red);background:var(--red-soft);}}
   .comment-form{{display:flex;gap:6px;}}
   .comment-form[hidden]{{display:none;}}
   .comment-form input{{flex:1;font:inherit;font-size:12px;padding:6px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}}
@@ -432,10 +435,21 @@ TEMPLATE = """<!doctype html>
   const FIREBASE_CONFIG = {firebase_config_json};
   const FIREBASE_ENABLED = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey);
   let db = null;
+  // Анонимный вход (Firebase Authentication -> Sign-in method -> Anonymous)
+  // — без экрана логина, но у каждого браузера появляется свой скрытый
+  // стабильный uid. Нужен, чтобы можно было по-настоящему (на уровне
+  // Security Rules, а не только в интерфейсе) разрешить автору удалять
+  // только свои комментарии — см. author_uid в блоке «Комментарии» ниже.
+  let currentUid = null;
+  let authReady = Promise.resolve();
   if (FIREBASE_ENABLED) {{
     try {{
       firebase.initializeApp(FIREBASE_CONFIG);
       db = firebase.firestore();
+      firebase.auth().onAuthStateChanged(user => {{ currentUid = user ? user.uid : null; }});
+      authReady = firebase.auth().signInAnonymously().catch(err => {{
+        console.error('Анонимный вход не включён в Firebase (Authentication -> Sign-in method -> Anonymous) — комментировать и удалять свои комментарии будет нельзя, см. README:', err);
+      }});
     }} catch (e) {{
       console.error('Firebase не инициализировался — общие функции будут отключены/локальны:', e);
       db = null;
@@ -857,6 +871,19 @@ TEMPLATE = """<!doctype html>
       disabledNote.hidden = false;
       return;
     }}
+    // Форма скрыта, пока не пришёл ответ анонимного входа — если он не
+    // настроен в консоли Firebase, оставляем комментарии в режиме «только
+    // чтение» с понятным пояснением вместо формы.
+    form.hidden = true;
+    authReady.then(() => {{
+      if (currentUid) {{
+        form.hidden = false;
+        disabledNote.hidden = true;
+      }} else {{
+        disabledNote.textContent = 'Нужен анонимный вход в Firebase (Authentication -> Sign-in method -> Anonymous) — без него нельзя оставлять и удалять комментарии, см. README.';
+        disabledNote.hidden = false;
+      }}
+    }});
     det.addEventListener('toggle', () => {{
       if (det.open && !commentUnsubs[fid]) {{
         commentUnsubs[fid] = db.collection('signal_comments').doc(fid).collection('items')
@@ -871,12 +898,31 @@ TEMPLATE = """<!doctype html>
               const when = (d.created_at && d.created_at.toDate) ? d.created_at.toDate().toLocaleString('ru-RU') : '';
               const item = document.createElement('div');
               item.className = 'comment-item';
-              item.textContent = d.text || '';
+              const body = document.createElement('span');
+              body.className = 'body';
+              body.textContent = d.text || '';
+              item.appendChild(body);
               if (when) {{
                 const t = document.createElement('span');
                 t.className = 't';
                 t.textContent = when;
                 item.appendChild(t);
+              }}
+              // Кнопка удаления — только у автора своего комментария (свой
+              // author_uid == текущий анонимный uid этого браузера); само
+              // удаление разрешено правилами Firestore только автору, это
+              // не просто скрытая в интерфейсе кнопка.
+              if (currentUid && d.author_uid === currentUid) {{
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'comment-del';
+                delBtn.title = 'Удалить свой комментарий';
+                delBtn.setAttribute('aria-label', 'Удалить свой комментарий');
+                delBtn.textContent = '✕';
+                delBtn.addEventListener('click', () => {{
+                  doc.ref.delete().catch(err => console.error('Не удалось удалить комментарий:', err));
+                }});
+                item.appendChild(delBtn);
               }}
               list.appendChild(item);
             }});
@@ -885,10 +931,11 @@ TEMPLATE = """<!doctype html>
     }});
     form.addEventListener('submit', e => {{
       e.preventDefault();
+      if (!currentUid) return;
       const text = inputEl.value.trim();
       if (!text) return;
       db.collection('signal_comments').doc(fid).collection('items').add({{
-        text, created_at: firebase.firestore.FieldValue.serverTimestamp(),
+        text, author_uid: currentUid, created_at: firebase.firestore.FieldValue.serverTimestamp(),
       }}).then(() => {{ inputEl.value = ''; }}).catch(err => console.error('Не удалось сохранить комментарий:', err));
     }});
   }});
@@ -1390,7 +1437,8 @@ def build():
     if firebase_enabled:
         firebase_scripts_html = (
             '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>\n'
-            '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>'
+            '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>\n'
+            '<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>'
         )
         firebase_config_json = json.dumps({
             "apiKey": firebase_cfg.get("api_key", ""),
