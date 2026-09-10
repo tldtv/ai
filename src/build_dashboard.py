@@ -223,7 +223,6 @@ TEMPLATE = """<!doctype html>
   .vote-row[hidden]{{display:none;}}
   .vote-btn{{font:inherit;font-size:10.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}}
   .vote-btn.voted{{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600;}}
-  .vote-btn:disabled{{cursor:not-allowed;}}
   .vote-hint{{font-size:10.5px;color:var(--ink-soft);margin:4px 0 0;line-height:1.4;}}
   .vote-hint[hidden]{{display:none;}}
 
@@ -567,10 +566,13 @@ TEMPLATE = """<!doctype html>
     const myChoice = localVoteChoice[fid];
     const hint = card.querySelector('[data-vote-hint]');
     if (hint) hint.hidden = !myChoice;
+    // Ни одна кнопка не блокируется: клик по уже выбранному варианту
+    // снимает голос (retractVote), клик по другому — переголосование
+    // (castVote). Обе ветки разбираются в обработчике клика на .vote-row.
     row.querySelectorAll('.vote-btn').forEach(btn => {{
       const isMine = myChoice === btn.dataset.vote;
       btn.classList.toggle('voted', isMine);
-      btn.disabled = isMine;
+      btn.title = isMine ? 'Нажмите ещё раз, чтобы снять голос' : '';
     }});
   }}
 
@@ -621,9 +623,14 @@ TEMPLATE = """<!doctype html>
 
   grid.addEventListener('click', e => {{
     const voteBtn = e.target.closest('.vote-btn');
-    if (voteBtn && !voteBtn.disabled) {{
+    if (voteBtn) {{
       const card = voteBtn.closest('.card');
-      castVote(card, voteBtn.dataset.vote);
+      const fid = card.dataset.fid;
+      if (localVoteChoice[fid] === voteBtn.dataset.vote) {{
+        retractVote(card); // клик по уже выбранному варианту — снять голос
+      }} else {{
+        castVote(card, voteBtn.dataset.vote); // клик по другому — переголосовать
+      }}
       return;
     }}
     const resetBtn = e.target.closest('[data-reset-scores]');
@@ -685,6 +692,41 @@ TEMPLATE = """<!doctype html>
       persistVoteChoice();
       updateVoteUI(card, votesMap[fid]);
     }}).catch(err => console.error('Не удалось проголосовать:', err));
+  }}
+
+  // Снять голос совсем (не заменить другим): счётчик прежнего варианта
+  // уменьшается на 1, «мой выбор» у этого сигнала очищается. Если из-за
+  // этого ни один вариант больше не набирает votes_to_promote, сигнал
+  // (через computeLevel2Status при следующем recomputeAll) возвращается
+  // на 1-й уровень.
+  function retractVote(card) {{
+    const fid = card.dataset.fid;
+    const prevChoice = localVoteChoice[fid];
+    if (!prevChoice) return;
+    if (!db) {{
+      const data = votesMap[fid] || {{ out: 0, maybe: 0, hot: 0 }};
+      data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
+      votesMap[fid] = data;
+      persistVotesLocal();
+      delete localVoteChoice[fid];
+      persistVoteChoice();
+      recomputeAll();
+      return;
+    }}
+    const ref = db.collection('signal_votes').doc(fid);
+    db.runTransaction(tx => tx.get(ref).then(doc => {{
+      const data = doc.exists ? doc.data() : {{ out: 0, maybe: 0, hot: 0 }};
+      data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
+      tx.set(ref, {{
+        out: data.out || 0,
+        maybe: data.maybe || 0,
+        hot: data.hot || 0,
+      }}, {{ merge: true }});
+    }})).then(() => {{
+      delete localVoteChoice[fid];
+      persistVoteChoice();
+      updateVoteUI(card, votesMap[fid]);
+    }}).catch(err => console.error('Не удалось снять голос:', err));
   }}
 
   grid.addEventListener('change', e => {{
@@ -1263,8 +1305,9 @@ def render_vote_row():
         '<button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button>'
         '<button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button>'
         '</div>'
-        '<p class="vote-hint" data-vote-hint hidden>Голос можно изменить в любой момент — сигнал может вернуться'
-        ' на 1-й уровень или перейти в другую группу 2-го уровня.</p>'
+        '<p class="vote-hint" data-vote-hint hidden>Клик по другому варианту — переголосовать, клик по уже'
+        ' выбранному — снять голос совсем. Сигнал может вернуться на 1-й уровень или перейти в другую группу'
+        ' 2-го уровня.</p>'
     )
 
 
