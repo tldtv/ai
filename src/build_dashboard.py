@@ -153,6 +153,8 @@ TEMPLATE = """<!doctype html>
   .tab, .sortbtn, .groupbtn, .freshbtn{{font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--ink);}}
   .tab.active, .sortbtn.active, .groupbtn.active, .freshbtn.active{{background:var(--accent);color:#fff;border-color:var(--accent);}}
   .sort{{font-size:12px;color:var(--ink-soft);align-items:center;}}
+  .reset-filters-btn{{font:inherit;font-size:12.5px;padding:6px 14px;border-radius:999px;border:1px dashed var(--border);background:transparent;color:var(--ink-soft);cursor:pointer;}}
+  .reset-filters-btn:hover{{border-color:var(--ink-soft);color:var(--ink);}}
 
   .info-popover{{position:relative;display:inline-flex;}}
   .info-btn{{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);font-size:12px;cursor:pointer;line-height:1;}}
@@ -358,6 +360,7 @@ TEMPLATE = """<!doctype html>
         </div>
         <button class="freshbtn" id="freshBtn" type="button" title="Показать сигналы, найденные за последние 7 дней">🆕 Свежак</button>
       </div>
+      <button class="reset-filters-btn" id="resetFiltersBtn" type="button" title="Сбросить рынок, группу источника, оценку и дату к значениям по умолчанию">↺ Сбросить фильтры</button>
     </div>
     <div class="sort" id="sort">
       Сортировка:
@@ -913,6 +916,33 @@ TEMPLATE = """<!doctype html>
       state.dateFrom = iso(weekAgo); state.dateTo = '';
       freshBtn.classList.add('active');
     }}
+    apply();
+  }});
+
+  // «Сбросить фильтры» — возвращает рынок, группу источника, диапазон
+  // оценки, дату и быстрые фильтры светофора/группы 2-го уровня к
+  // значениям по умолчанию. Сортировку и текущий уровень (1/2) не трогает —
+  // это режим просмотра, а не фильтр.
+  document.getElementById('resetFiltersBtn').addEventListener('click', () => {{
+    state.market = 'Все';
+    document.querySelectorAll('#tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.market === 'Все'));
+
+    state.group = 'Все';
+    document.querySelectorAll('#groups .groupbtn').forEach(t => t.classList.toggle('active', t.dataset.group === 'Все'));
+
+    scoreMinRange.value = 0; scoreMaxRange.value = 5;
+    updateScoreUI();
+
+    dateFrom.value = ''; dateTo.value = '';
+    state.dateFrom = ''; state.dateTo = '';
+    freshBtn.classList.remove('active');
+
+    state.color = 'Все';
+    document.querySelectorAll('#stats .stat').forEach(s => s.classList.toggle('active', s.dataset.color === 'Все'));
+
+    state.l2 = 'Все';
+    document.querySelectorAll('#stats2 .stat').forEach(s => s.classList.toggle('active', s.dataset.l2 === 'Все'));
+
     apply();
   }});
 
