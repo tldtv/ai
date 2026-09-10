@@ -215,6 +215,9 @@ TEMPLATE = """<!doctype html>
   .breakdown li.overridden .override-flag{{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;line-height:1;flex-shrink:0;}}
   .crit-input{{width:36px;font:inherit;font-size:12px;font-weight:700;text-align:center;border:1px solid var(--border);border-radius:6px;padding:2px 3px;background:var(--surface);color:var(--ink);}}
   .crit-input:focus{{outline:2px solid var(--accent);outline-offset:1px;}}
+  .reset-btn{{display:block;font:inherit;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;margin:8px 0 2px;}}
+  .reset-btn:not(:disabled):hover{{border-color:var(--accent);color:var(--accent);}}
+  .reset-btn:disabled{{opacity:.5;cursor:not-allowed;}}
 
   .vote-row{{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;}}
   .vote-row[hidden]{{display:none;}}
@@ -577,6 +580,8 @@ TEMPLATE = """<!doctype html>
           if (flag) flag.hidden = !hasOverride;
         }}
       }});
+      const resetBtn = card.querySelector('[data-reset-scores]');
+      if (resetBtn) resetBtn.disabled = Object.keys(overrides).length === 0;
 
       let baseColor = card.dataset.bakedColor;
       if (Object.keys(criteriaBase).length) {{
@@ -605,8 +610,29 @@ TEMPLATE = """<!doctype html>
     if (voteBtn && !voteBtn.disabled) {{
       const card = voteBtn.closest('.card');
       castVote(card, voteBtn.dataset.vote);
+      return;
+    }}
+    const resetBtn = e.target.closest('[data-reset-scores]');
+    if (resetBtn && !resetBtn.disabled) {{
+      const card = resetBtn.closest('.card');
+      resetOverrides(card);
     }}
   }});
+
+  // Сбрасывает все ручные правки оценки сигнала обратно к тому, что
+  // выставила система (baked-значения из window.SIGNALS) — пометки
+  // «изменено вручную» у всех критериев этого сигнала пропадают.
+  function resetOverrides(card) {{
+    const fid = card.dataset.fid;
+    if (!db) {{
+      delete overridesMap[fid];
+      persistOverridesLocal();
+      recomputeAll();
+      return;
+    }}
+    db.collection('signal_overrides').doc(fid).set({{ overrides: {{}} }})
+      .catch(err => console.error('Не удалось сбросить ручные оценки:', err));
+  }}
 
   // Голос можно менять сколько угодно раз: клик по другому варианту снимает
   // старый голос и добавляет новый — счётчики, а значит и группа 2-го
@@ -1138,7 +1164,11 @@ def render_breakdown(row):
         f'/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li>'
         for k, v in scores.items()
     )
-    return f'<details class="card-collapse breakdown"><summary>Разбивка оценки (можно менять)</summary><ul>{items}</ul></details>'
+    return (
+        '<details class="card-collapse breakdown"><summary>Разбивка оценки</summary>'
+        '<button type="button" class="reset-btn" data-reset-scores disabled>Вернуть к оценке агента</button>'
+        f'<ul>{items}</ul></details>'
+    )
 
 
 def render_description_blocks(row):
