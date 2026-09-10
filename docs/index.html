@@ -144,7 +144,6 @@
   .vote-row[hidden]{display:none;}
   .vote-btn{font:inherit;font-size:10.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink-soft);cursor:pointer;}
   .vote-btn.voted{border-color:var(--accent);color:var(--accent);background:var(--accent-soft);font-weight:600;}
-  .vote-btn:disabled{cursor:not-allowed;}
   .vote-hint{font-size:10.5px;color:var(--ink-soft);margin:4px 0 0;line-height:1.4;}
   .vote-hint[hidden]{display:none;}
 
@@ -298,7 +297,7 @@
       <details class="card-collapse"><summary>Идея из новости</summary><p class="body">Компания Alex привлекла $20M ($17M Series A + $3M seed) на платформу, автоматизирующую этапы найма: видео/телефонные интервью, скрининг резюме, планирование, детекцию мошенничества, ATS-интеграцию. Инвесторы: Peak XV Partners, Y Combinator, 1984 Ventures. Крупный раунд на end-to-end автоматизацию воронки найма показывает, что инвесторы делают ставку на полный AI-найм, а не на точечные функции — вызов для AIR, который пока закрывает отдельные этапы, а не всю воронку.</p></details><details class="card-collapse" open><summary>Применимость для Авито</summary><p class="body">Расширить AIR от точечного AI-скрининга к end-to-end автоматизации воронки (интервью + fraud-детекция + ATS-интеграция) как апсейл-модуль для HR-tech клиентов Авито.Работы.</p></details>
       <details class="card-collapse misc"><summary>Прочее</summary><ul class="misc-list"><li><a href="https://hrtechfeed.com/ai-powered-recruiting-startup-lands-20-million/" target="_blank" rel="noopener">Источник</a></li><li>Дата источника: 2025-09-29</li><li>Уверенность: Низкая-средняя — единственный сигнал, дата вне целевого окна (июнь–август 2026), нужен повторный поиск на аналогичные раунды именно в этот период.</li><li><span class="flag">вне целевого окна</span></li></ul></details>
       <details class="card-collapse breakdown"><summary>Разбивка оценки</summary><button type="button" class="reset-btn" data-reset-scores disabled>Вернуть к оценке агента</button><ul><li class="crit-row" data-criterion="strategic_fit"><span class="crit-name" tabindex="0" data-tip="Насколько идея соответствует стратегии и одному из трёх рынков Авито.Работы (Классифайд, Подработка, HR-tech)">Соответствие рынку</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="strategic_fit">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="signal_strength"><span class="crit-name" tabindex="0" data-tip="Насколько сигнал подтверждён — несколько независимых источников сильнее, чем одно упоминание">Сила сигнала</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="3" data-orig="3" data-criterion="signal_strength">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="market_growth"><span class="crit-name" tabindex="0" data-tip="Насколько велик и быстро растёт рынок или тренд, к которому относится сигнал">Размер/рост рынка</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="market_growth">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="asset_fit"><span class="crit-name" tabindex="0" data-tip="Насколько легко реализовать идею на существующих активах Авито — аудитории, платформе, интеграциях">Fit с активами Авито</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="asset_fit">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="feasibility"><span class="crit-name" tabindex="0" data-tip="Насколько реалистично собрать MVP в разумный срок доступными ресурсами">Реализуемость MVP</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="3" data-orig="3" data-criterion="feasibility">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="urgency"><span class="crit-name" tabindex="0" data-tip="Насколько узко окно возможности — конкуренты или тренд не будут ждать">Срочность/окно</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="3" data-orig="3" data-criterion="urgency">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="regulatory_risk"><span class="crit-name" tabindex="0" data-tip="Насколько низки регуляторные и юридические риски запуска — чем выше оценка, тем меньше риск">Регуляторный риск</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="regulatory_risk">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li></ul></details>
-      <div class="vote-row" data-vote-row><button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button><button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button><button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button></div><p class="vote-hint" data-vote-hint hidden>Голос можно изменить в любой момент — сигнал может вернуться на 1-й уровень или перейти в другую группу 2-го уровня.</p>
+      <div class="vote-row" data-vote-row><button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button><button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button><button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button></div><p class="vote-hint" data-vote-hint hidden>Клик по другому варианту — переголосовать, клик по уже выбранному — снять голос совсем. Сигнал может вернуться на 1-й уровень или перейти в другую группу 2-го уровня.</p>
       <details class="card-collapse comments"><summary>Комментарии</summary><div class="comment-list" data-comment-list></div><form class="comment-form" data-comment-form><input type="text" placeholder="Оставить комментарий…" maxlength="500" data-comment-input><button type="submit">Добавить</button></form><p class="disabled-note" data-comment-disabled hidden>Комментарии видны только при настроенном Firebase (см. README).</p></details>
     </article>
     <article class="card green" data-key="https://branchapp.com/blog/flex-embedded-ewa|Branch: Expanding Earned Wage Access - the new Flex model" data-idx="1" data-baked-color="green" data-orig-color="green" data-market="Подработка" data-color="green" data-group="РФ/ТГ" data-score="4.0" data-date="2026-07-14">
@@ -311,7 +310,7 @@
       <details class="card-collapse"><summary>Идея из новости</summary><p class="body">Branch выпустил конфигурацию Flex для earned wage access (EWA), убирающую необходимость интеграции с payroll/time-tracking системами клиента; срок внедрения сокращается с месяцев до недель. Ориентирован на staffing-платформы, маркетплейсы, hospitality и workforce management системы. Снижение барьера интеграции EWA сигнализирует, что рынок embedded-финтеха для gig/staffing переходит от «сложно внедрить» к «подключаемая функция» — окно для быстрого запуска EWA у платформенных игроков расширяется, а не сужается.</p></details><details class="card-collapse" open><summary>Применимость для Авито</summary><p class="body">Добавить мгновенный вывод заработанного (earned wage access) как встроенную функцию в Авито.Подработку через партнёрство с платёжным провайдером вместо самостоятельной разработки инфраструктуры.</p></details>
       <details class="card-collapse misc"><summary>Прочее</summary><ul class="misc-list"><li><a href="https://branchapp.com/blog/flex-embedded-ewa" target="_blank" rel="noopener">Источник</a></li><li>Дата источника: 2026-07-14</li><li>Уверенность: Средняя-высокая — сигнал внутри целевого окна, тема подтверждается несколькими независимыми EWA-платформами по данным поиска, не только Branch.</li></ul></details>
       <details class="card-collapse breakdown"><summary>Разбивка оценки</summary><button type="button" class="reset-btn" data-reset-scores disabled>Вернуть к оценке агента</button><ul><li class="crit-row" data-criterion="strategic_fit"><span class="crit-name" tabindex="0" data-tip="Насколько идея соответствует стратегии и одному из трёх рынков Авито.Работы (Классифайд, Подработка, HR-tech)">Соответствие рынку</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="5" data-orig="5" data-criterion="strategic_fit">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="signal_strength"><span class="crit-name" tabindex="0" data-tip="Насколько сигнал подтверждён — несколько независимых источников сильнее, чем одно упоминание">Сила сигнала</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="signal_strength">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="market_growth"><span class="crit-name" tabindex="0" data-tip="Насколько велик и быстро растёт рынок или тренд, к которому относится сигнал">Размер/рост рынка</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="market_growth">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="asset_fit"><span class="crit-name" tabindex="0" data-tip="Насколько легко реализовать идею на существующих активах Авито — аудитории, платформе, интеграциях">Fit с активами Авито</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="5" data-orig="5" data-criterion="asset_fit">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="feasibility"><span class="crit-name" tabindex="0" data-tip="Насколько реалистично собрать MVP в разумный срок доступными ресурсами">Реализуемость MVP</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="3" data-orig="3" data-criterion="feasibility">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="urgency"><span class="crit-name" tabindex="0" data-tip="Насколько узко окно возможности — конкуренты или тренд не будут ждать">Срочность/окно</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="4" data-orig="4" data-criterion="urgency">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li><li class="crit-row" data-criterion="regulatory_risk"><span class="crit-name" tabindex="0" data-tip="Насколько низки регуляторные и юридические риски запуска — чем выше оценка, тем меньше риск">Регуляторный риск</span><span class="val"><input class="crit-input" type="number" min="1" max="5" step="1" value="3" data-orig="3" data-criterion="regulatory_risk">/5<span class="override-flag" tabindex="0" data-tip="Изменено вручную" hidden>✎</span></span></li></ul></details>
-      <div class="vote-row" data-vote-row><button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button><button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button><button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button></div><p class="vote-hint" data-vote-hint hidden>Голос можно изменить в любой момент — сигнал может вернуться на 1-й уровень или перейти в другую группу 2-го уровня.</p>
+      <div class="vote-row" data-vote-row><button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button><button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button><button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button></div><p class="vote-hint" data-vote-hint hidden>Клик по другому варианту — переголосовать, клик по уже выбранному — снять голос совсем. Сигнал может вернуться на 1-й уровень или перейти в другую группу 2-го уровня.</p>
       <details class="card-collapse comments"><summary>Комментарии</summary><div class="comment-list" data-comment-list></div><form class="comment-form" data-comment-form><input type="text" placeholder="Оставить комментарий…" maxlength="500" data-comment-input><button type="submit">Добавить</button></form><p class="disabled-note" data-comment-disabled hidden>Комментарии видны только при настроенном Firebase (см. README).</p></details>
     </article></div>
 
@@ -516,10 +515,13 @@
     const myChoice = localVoteChoice[fid];
     const hint = card.querySelector('[data-vote-hint]');
     if (hint) hint.hidden = !myChoice;
+    // Ни одна кнопка не блокируется: клик по уже выбранному варианту
+    // снимает голос (retractVote), клик по другому — переголосование
+    // (castVote). Обе ветки разбираются в обработчике клика на .vote-row.
     row.querySelectorAll('.vote-btn').forEach(btn => {
       const isMine = myChoice === btn.dataset.vote;
       btn.classList.toggle('voted', isMine);
-      btn.disabled = isMine;
+      btn.title = isMine ? 'Нажмите ещё раз, чтобы снять голос' : '';
     });
   }
 
@@ -570,9 +572,14 @@
 
   grid.addEventListener('click', e => {
     const voteBtn = e.target.closest('.vote-btn');
-    if (voteBtn && !voteBtn.disabled) {
+    if (voteBtn) {
       const card = voteBtn.closest('.card');
-      castVote(card, voteBtn.dataset.vote);
+      const fid = card.dataset.fid;
+      if (localVoteChoice[fid] === voteBtn.dataset.vote) {
+        retractVote(card); // клик по уже выбранному варианту — снять голос
+      } else {
+        castVote(card, voteBtn.dataset.vote); // клик по другому — переголосовать
+      }
       return;
     }
     const resetBtn = e.target.closest('[data-reset-scores]');
@@ -634,6 +641,41 @@
       persistVoteChoice();
       updateVoteUI(card, votesMap[fid]);
     }).catch(err => console.error('Не удалось проголосовать:', err));
+  }
+
+  // Снять голос совсем (не заменить другим): счётчик прежнего варианта
+  // уменьшается на 1, «мой выбор» у этого сигнала очищается. Если из-за
+  // этого ни один вариант больше не набирает votes_to_promote, сигнал
+  // (через computeLevel2Status при следующем recomputeAll) возвращается
+  // на 1-й уровень.
+  function retractVote(card) {
+    const fid = card.dataset.fid;
+    const prevChoice = localVoteChoice[fid];
+    if (!prevChoice) return;
+    if (!db) {
+      const data = votesMap[fid] || { out: 0, maybe: 0, hot: 0 };
+      data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
+      votesMap[fid] = data;
+      persistVotesLocal();
+      delete localVoteChoice[fid];
+      persistVoteChoice();
+      recomputeAll();
+      return;
+    }
+    const ref = db.collection('signal_votes').doc(fid);
+    db.runTransaction(tx => tx.get(ref).then(doc => {
+      const data = doc.exists ? doc.data() : { out: 0, maybe: 0, hot: 0 };
+      data[prevChoice] = Math.max(0, (data[prevChoice] || 0) - 1);
+      tx.set(ref, {
+        out: data.out || 0,
+        maybe: data.maybe || 0,
+        hot: data.hot || 0,
+      }, { merge: true });
+    })).then(() => {
+      delete localVoteChoice[fid];
+      persistVoteChoice();
+      updateVoteUI(card, votesMap[fid]);
+    }).catch(err => console.error('Не удалось снять голос:', err));
   }
 
   grid.addEventListener('change', e => {
