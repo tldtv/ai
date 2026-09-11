@@ -260,15 +260,28 @@ def _tg_escape(text):
     return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# Ссылка на карточку сигнала на дашборде (?card=<fid>) — build_dashboard.py
+# (checkCardFocusLink) по этому fid находит ровно ту же карточку, что видна
+# в общем списке, и показывает только её, со всем её функционалом (голос,
+# комментарии, ручные правки). fid — тот же hash_key(card_key(row)), что уже
+# кладём в row["_fid"] в load_level1_signals.
+def _card_url(dashboard_url, fid):
+    if not dashboard_url or not fid:
+        return ""
+    return f"{dashboard_url}?card={fid}"
+
+
 # Telegram (parse_mode=HTML) поддерживает <blockquote> — рендерится как
 # блок с цветной вертикальной полосой слева и лёгкой заливкой, тот же
 # визуальный приём, что и рамка карточки в письме, только без выбора
 # цвета (Telegram красит полосу сам, одним фиксированным акцентным
 # цветом — за это отвечает цветной кружок в заголовке цветовой группы
 # над карточками). Каждая идея — один blockquote, это и есть карточка.
-def _idea_blockquote(r, color):
+def _idea_blockquote(r, color, dashboard_url):
     title = _tg_escape((r.get("title") or "").strip())
-    body = [f"<b>{title}</b>"]
+    card_url = _card_url(dashboard_url, r.get("_fid"))
+    title_html = f'<a href="{_tg_escape(card_url)}">{title}</a>' if card_url else title
+    body = [f"<b>{title_html}</b>"]
     for label, value in _idea_meta_lines(r):
         body.append(f"• {label}: {_tg_escape(value)}")
     url = r.get("source_url") or ""
@@ -294,7 +307,7 @@ def build_text_digest(rows, dashboard_url, is_welcome=False, unsub_url=""):
         lines.append(COLOR_LABELS[color])
         lines.append("")
         for r in group:
-            lines.append(_idea_blockquote(r, color))
+            lines.append(_idea_blockquote(r, color, dashboard_url))
             lines.append("")
     if dashboard_url:
         lines.append(f'<a href="{_tg_escape(dashboard_url)}">Открыть дашборд</a>')
@@ -326,6 +339,12 @@ def build_html_digest(rows, dashboard_url, is_welcome=False, unsub_url=""):
         parts.append(f"<h3 style='margin:18px 0 10px;'>{COLOR_LABELS[color]}</h3>")
         for r in group:
             title = html.escape((r.get("title") or "").strip())
+            card_url = _card_url(dashboard_url, r.get("_fid"))
+            title_html = (
+                f"<a href='{card_url}' style='color:inherit;text-decoration:underline;"
+                f"text-decoration-color:{style['border']};'>{title}</a>"
+                if card_url else title
+            )
             url = r.get("source_url") or "#"
             domain = html.escape(_source_domain(url)) or "Источник"
             li_items = [f"<li>{label}: {html.escape(value)}</li>" for label, value in _idea_meta_lines(r)]
@@ -339,7 +358,7 @@ def build_html_digest(rows, dashboard_url, is_welcome=False, unsub_url=""):
                 "border-radius:0 8px 8px 0; padding:10px 16px; margin-bottom:12px;'>"
                 "<div style='font-weight:600; font-size:15px; margin-bottom:6px;'>{title}</div>"
                 "<ul style='margin:0; padding-left:18px; font-size:13.5px; color:#333;'>{items}</ul>"
-                "</div>".format(border=style["border"], bg=style["bg"], title=title, items="".join(li_items))
+                "</div>".format(border=style["border"], bg=style["bg"], title=title_html, items="".join(li_items))
             )
     if dashboard_url:
         parts.append(f"<p style='margin-top:20px;'><a href='{dashboard_url}'>Открыть дашборд</a></p>")

@@ -102,6 +102,15 @@ TEMPLATE = """<!doctype html>
   h1{{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}}
   .sub{{color:var(--ink-soft);font-size:13px;margin:0 0 18px;}}
 
+  /* Баннер режима "один сигнал по ссылке из рассылки" (?card=<fid>) —
+     см. checkCardFocusLink() в скрипте ниже. */
+  .card-focus-banner{{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F1EBFB;border:1px solid #d9c8f5;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13.5px;color:var(--ink);}}
+  .card-focus-banner[hidden]{{display:none;}}
+  .card-focus-banner strong{{color:var(--accent);}}
+  .card-focus-back{{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;}}
+  .card-focus-back:hover{{filter:brightness(1.08);}}
+  body.card-focus-mode .grid{{max-width:720px;margin:0 auto;}}
+
   [data-tip]{{position:relative;cursor:help;}}
   [data-tip]:hover::after, [data-tip]:focus::after{{
     content:attr(data-tip);
@@ -130,6 +139,7 @@ TEMPLATE = """<!doctype html>
   .admin-btn:hover{{border-color:var(--accent);color:var(--accent);}}
 
   .level-switch{{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}}
+  .level-switch[hidden]{{display:none;}}
   .level-btn{{font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);cursor:pointer;}}
   .level-btn.active{{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}}
 
@@ -146,6 +156,7 @@ TEMPLATE = """<!doctype html>
   .stat.active{{outline:2px solid var(--accent);outline-offset:-1px;}}
 
   .toolbar{{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px 24px;margin-bottom:18px;}}
+  .toolbar[hidden]{{display:none;}}
   .filters{{display:flex;flex-wrap:wrap;gap:16px 26px;align-items:center;}}
   .filter-group{{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}}
   .filter-label{{font-size:12px;color:var(--ink-soft);margin-right:2px;}}
@@ -293,6 +304,11 @@ TEMPLATE = """<!doctype html>
     </span>
   </h1>
   <p class="sub">Бэклог сигналов · </p>
+
+  <div class="card-focus-banner" id="cardFocusBanner" hidden>
+    <span>📩 На этой странице показан <strong>один</strong> из множества найденных сигналов.</span>
+    <a class="card-focus-back" id="cardFocusBack" href="#">↺ Показать все сигналы</a>
+  </div>
 
   <div class="level-switch" id="levelSwitch">
     <button class="level-btn active" data-level="1" type="button">Уровень 1 · Сырой список</button>
@@ -485,7 +501,7 @@ TEMPLATE = """<!doctype html>
 </script>
 {firebase_scripts}
 <script>
-  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все' }};
+  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все', focusFid: null }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
   const L2_COLOR = {{ out: 'grey', maybe: 'yellow', hot: 'green' }};
@@ -828,17 +844,24 @@ TEMPLATE = """<!doctype html>
   function apply() {{
     let visible = 0;
     cards().forEach(c => {{
-      const isPromoted = !!c.dataset.level2;
-      const levelMatch = state.level === 1 ? !isPromoted : isPromoted;
-      const l2Match = state.level !== 2 || state.l2 === 'Все' || c.dataset.level2 === state.l2;
-      const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
-      const matchColor = state.level !== 1 || state.color === 'Все' || c.dataset.color === state.color;
-      const matchGroup = state.group === 'Все' || c.dataset.group === state.group;
-      const score = parseFloat(c.dataset.score);
-      const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
-      const d = c.dataset.date || '';
-      const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
-      const show = levelMatch && l2Match && matchMarket && matchColor && matchGroup && matchScore && matchDate;
+      let show;
+      if (state.focusFid) {{
+        // Режим "один сигнал по ссылке" — игнорируем все обычные фильтры,
+        // показываем только карточку с совпадающим fid (см. checkCardFocusLink).
+        show = c.dataset.fid === state.focusFid;
+      }} else {{
+        const isPromoted = !!c.dataset.level2;
+        const levelMatch = state.level === 1 ? !isPromoted : isPromoted;
+        const l2Match = state.level !== 2 || state.l2 === 'Все' || c.dataset.level2 === state.l2;
+        const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
+        const matchColor = state.level !== 1 || state.color === 'Все' || c.dataset.color === state.color;
+        const matchGroup = state.group === 'Все' || c.dataset.group === state.group;
+        const score = parseFloat(c.dataset.score);
+        const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
+        const d = c.dataset.date || '';
+        const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
+        show = levelMatch && l2Match && matchMarket && matchColor && matchGroup && matchScore && matchDate;
+      }}
       c.classList.toggle('hidden', !show);
       if (show) visible++;
     }});
@@ -846,7 +869,9 @@ TEMPLATE = """<!doctype html>
     if (visible === 0 && !empty) {{
       empty = document.createElement('p');
       empty.className = 'empty';
-      empty.textContent = 'Нет сигналов под текущий фильтр';
+      empty.textContent = state.focusFid
+        ? 'Этот сигнал не найден в текущем бэклоге — возможно, ссылка устарела.'
+        : 'Нет сигналов под текущий фильтр';
       grid.appendChild(empty);
     }} else if (visible > 0 && empty) {{
       empty.remove();
@@ -1262,6 +1287,36 @@ TEMPLATE = """<!doctype html>
       .catch(err => {{ console.error('Не удалось отписать (возможно, ссылка уже использована):', err); }});
   }}
   checkUnsubscribeLink();
+
+  // Фокус на одном сигнале по клику на заголовок идеи в письме/
+  // telegram-сообщении (?card=<fid>, тот же fid, что и hashKey(data-key)
+  // выше). Карточка остаётся ровно тем же DOM-узлом в #grid — просто все
+  // остальные скрыты — поэтому голосование, комментарии, ручные правки и
+  // админ-панель работают один в один как на полном дашборде: это не
+  // отдельная копия карточки, а она же.
+  function checkCardFocusLink() {{
+    const params = new URLSearchParams(location.search);
+    const fid = params.get('card');
+    if (!fid) return;
+    state.focusFid = fid;
+    document.body.classList.add('card-focus-mode');
+    document.getElementById('levelSwitch').hidden = true;
+    document.getElementById('stats').hidden = true;
+    document.getElementById('stats2').hidden = true;
+    document.querySelector('.toolbar').hidden = true;
+    document.getElementById('cardFocusBanner').hidden = false;
+    // В письме человек не может "раскрыть" свёрнутые блоки заранее — сразу
+    // показываем всё содержимое карточки, включая комментарии и разбивку.
+    const target = cards().find(c => c.dataset.fid === fid);
+    if (target) {{
+      target.querySelectorAll('details.card-collapse').forEach(d => {{ d.open = true; }});
+    }}
+  }}
+  checkCardFocusLink();
+  document.getElementById('cardFocusBack').addEventListener('click', e => {{
+    e.preventDefault();
+    location.href = location.pathname; // сброс ?card=... — назад к полному дашборду
+  }});
 
   // ---- Загрузка и подписки ----
   sortCards();
