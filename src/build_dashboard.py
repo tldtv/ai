@@ -7,7 +7,7 @@ build_dashboard.py — читает data/backlog.csv и собирает docs/in
 «Применимость для Авито»), разбивкой оценки по критериям с подсказками и
 РУЧНЫМ редактированием каждой оценки (пересчёт итога и цвета — сразу),
 комментариями к сигналу, голосованием за перевод сигнала на 2-й уровень
-(Отмели / Сомнительно, но окей / Очень интересно), переключателем уровней,
+(Не интересно / Отложить в бэклог / Копаем глубже), переключателем уровней,
 админ-панелью (пороги светофора, веса критериев, кол-во голосов для
 перехода на 2-й уровень, частота обновления) и кнопкой перехода к ручному
 запуску обновления в GitHub Actions.
@@ -335,13 +335,13 @@ TEMPLATE = """<!doctype html>
       <span class="n" id="statL2Total">0</span><span class="l">Всего на 2-м уровне</span>
     </button>
     <button class="stat grey" data-l2="out">
-      <span class="n" id="statL2Out">0</span><span class="l">⚪ Отмели</span>
+      <span class="n" id="statL2Out">0</span><span class="l">⚪ Не интересно</span>
     </button>
     <button class="stat yellow" data-l2="maybe">
-      <span class="n" id="statL2Maybe">0</span><span class="l">🤔 Сомнительно, но окей</span>
+      <span class="n" id="statL2Maybe">0</span><span class="l">🤔 Отложить в бэклог</span>
     </button>
     <button class="stat green" data-l2="hot">
-      <span class="n" id="statL2Hot">0</span><span class="l">🔥 Очень интересно</span>
+      <span class="n" id="statL2Hot">0</span><span class="l">🔥 Копаем глубже</span>
     </button>
   </div>
 
@@ -507,10 +507,10 @@ TEMPLATE = """<!doctype html>
   const L2_COLOR = {{ out: 'grey', maybe: 'yellow', hot: 'green' }};
 
   // Если в config/parameters.yaml -> dashboard.firebase заполнены ключи —
-  // «Отмели», ручные правки оценки, комментарии, голосование и админ-панель
-  // общие для всех, кто открывает дашборд (Firestore, обновление почти
-  // мгновенное). Если нет — «Отмели» и ручные правки оценки работают
-  // только локально в этом браузере, а голосование/комментарии/админ-панель
+  // «Не интересно», ручные правки оценки, комментарии, голосование и
+  // админ-панель общие для всех, кто открывает дашборд (Firestore, обновление
+  // почти мгновенное). Если нет — «Не интересно» и ручные правки оценки
+  // работают только локально в этом браузере, а голосование/комментарии/админ-панель
   // отключены с пояснением (это не то, что имеет смысл хранить только у
   // себя — весь смысл в том, чтобы видели все).
   const FIREBASE_CONFIG = {firebase_config_json};
@@ -626,8 +626,8 @@ TEMPLATE = """<!doctype html>
   // распределение голосов меняется (кто-то переголосовал), сигнал может
   // вернуться на 1-й уровень (ни один вариант больше не набирает порог)
   // либо переехать в другую группу 2-го уровня. При равенстве голосов
-  // у нескольких вариантов приоритет: Очень интересно > Сомнительно, но
-  // окей > Отмели.
+  // у нескольких вариантов приоритет: Копаем глубже > Отложить в бэклог
+  // > Не интересно.
   function computeLevel2Status(counts, votesToPromote) {{
     const order = ['hot', 'maybe', 'out'];
     let maxCount = 0;
@@ -1586,9 +1586,9 @@ def render_comments_block():
 def render_vote_row():
     return (
         '<div class="vote-row" data-vote-row>'
-        '<button type="button" class="vote-btn" data-vote="out">🗑 Отмели <span data-vote-count="out">0</span></button>'
-        '<button type="button" class="vote-btn" data-vote="maybe">🤔 Сомнительно, но окей <span data-vote-count="maybe">0</span></button>'
-        '<button type="button" class="vote-btn" data-vote="hot">🔥 Очень интересно <span data-vote-count="hot">0</span></button>'
+        '<button type="button" class="vote-btn" data-vote="out">🗑 Не интересно <span data-vote-count="out">0</span></button>'
+        '<button type="button" class="vote-btn" data-vote="maybe">🤔 Отложить в бэклог <span data-vote-count="maybe">0</span></button>'
+        '<button type="button" class="vote-btn" data-vote="hot">🔥 Копаем глубже <span data-vote-count="hot">0</span></button>'
         '</div>'
         '<p class="vote-hint" data-vote-hint hidden>Клик по другому варианту — переголосовать, клик по уже'
         ' выбранному — снять голос совсем. Сигнал может вернуться на 1-й уровень или перейти в другую группу'
