@@ -1,0 +1,49 @@
+name: Digest welcome check
+
+# Отдельный от еженедельного скана workflow — запускается часто (каждые
+# ~20 минут) и делает ровно одно: смотрит, не появилась ли новая подписка
+# на рассылку (или не подтвердил ли кто-то Telegram-бота нажатием Start),
+# и если да — отправляет этому человеку ПЕРВОЕ сообщение сразу, не
+# дожидаясь ближайшего понедельника. Использует тот же src/send_digest.py
+# и те же 3 секрета, что и weekly_signal_scan.yml — ничего дополнительно
+# настраивать не нужно.
+#
+# Как это не превращается в спам каждые 20 минут: send_digest.py сам
+# отправляет только сигналы, которых подписчик ещё не видел (сравнивает с
+# last_digest_at). Новые сигналы в принципе появляются только раз в
+# неделю, когда отрабатывает weekly_signal_scan.yml и обновляет
+# data/backlog.csv — поэтому в промежутке между понедельниками этот
+# workflow в 99% запусков просто ничего не находит и завершается за
+# секунды. "Второе" сообщение подписчик получит не отсюда, а из
+# следующего запуска weekly_signal_scan.yml — то есть ровно "раз в
+# неделю, в момент обновления", как и просили.
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: digest-welcome
+  cancel-in-progress: false
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send digest to new/newly-confirmed subscribers
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python src/send_digest.py

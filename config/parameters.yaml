@@ -93,7 +93,7 @@ process_constraints:
 # точное вхождение подстроки в заголовке/описании статьи "как есть", без
 # перевода и без учёта словоформ. Изначально тут были только английские
 # слова, из-за чего статьи из русскоязычных источников (vc.ru, Habr,
-# CNews — группа "РФ/ТГ") никогда не проходили require_market_match ниже
+# CNews — группа "РФ") никогда не проходили require_market_match ниже
 # и полностью отсеивались ещё до анализа моделью. Русские ключевые слова
 # ниже намеренно даны в виде КОРНЯ слова (например "подработ", а не
 # "подработка") — из-за русских падежей ("подработки", "подработкой" и
@@ -143,9 +143,9 @@ require_market_match: true
 # группы (описание показывается в подсказке у фильтра "Группа источника").
 # Ключи здесь — это ровно то, что указывается в sources -> group ниже.
 source_groups:
-  "РФ/ТГ":
+  "РФ":
     description: "Русскоязычные СМИ и Telegram-каналы про HR-tech, рекрутинг, стартапы и рынок труда в России."
-  "Мировой":
+  "Остальной мир":
     description: "Англоязычные международные источники про HR-tech, стартапы, венчур и рынок труда."
 
 # Источники. type: rss — проверенный рабочий RSS (реально протестирован и
@@ -155,66 +155,66 @@ source_groups:
 # README, раздел "Источники без RSS".
 sources:
   - name: "HR Tech Feed"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://hrtechfeed.com/feed/"
   - name: "TechCrunch"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://techcrunch.com/feed/"
   - name: "Crunchbase News"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://news.crunchbase.com/feed/"
   - name: "Recruiting Brainfood"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://www.recruitingbrainfood.com/feed"
   - name: "Sifted"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://sifted.eu/feed"
   - name: "Rest of World"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://restofworld.org/feed/"
   - name: "Y Combinator Blog"
-    group: "Мировой"
+    group: "Остальной мир"
     type: rss
     url: "https://www.ycombinator.com/blog/rss"
   - name: "vc.ru"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: rss
     url: "https://vc.ru/rss/all"
   - name: "Habr, хаб «Управление персоналом»"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: rss
     url: "https://habr.com/ru/rss/hub/hr_management/all/"
   - name: "CNews"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: rss
     url: "https://www.cnews.ru/inc/rss/news.xml"
   - name: "Huntflow (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/huntflow"
   - name: "Доказательный рекрутинг (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/docrecruiting"
   - name: "People Management Tech (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/PeopleManagementTech"
   - name: "Talent Hunters (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/talent_hunters"
   - name: "Русский венчур (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/rusven"
   - name: "проВенчур (Telegram)"
-    group: "РФ/ТГ"
+    group: "РФ"
     type: telegram
     url: "https://t.me/proventure"
