@@ -98,6 +98,7 @@ TEMPLATE = """<!doctype html>
     --yellow: #c98a1f;   --yellow-soft: #fbeed7; --yellow-ink: #8a5a12;
     --red: #c0392b;      --red-soft: #fbe1de;    --red-ink: #96291b;
     --grey: #8a8f96;     --grey-soft: #eceded;   --grey-ink: #5c6066;
+    --blue: #2f6fa8;     --blue-soft: #e2eef7;   --blue-ink: #1f4f78;
   }}
   /* Тёмная тема — переключатель в панели настроек (⚙️ -> "Оформление"),
      хранится в localStorage у каждого посетителя отдельно, ни с кем не
@@ -122,6 +123,7 @@ TEMPLATE = """<!doctype html>
       --yellow: #e0a83a;   --yellow-soft: #332711; --yellow-ink: #f0c874;
       --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
       --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
+      --blue: #6badea;     --blue-soft: #182636;   --blue-ink: #a8d0f5;
     }}
   }}
   :root[data-theme="dark"] {{
@@ -135,6 +137,7 @@ TEMPLATE = """<!doctype html>
     --yellow: #e0a83a;   --yellow-soft: #332711; --yellow-ink: #f0c874;
     --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
     --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
+    --blue: #6badea;     --blue-soft: #182636;   --blue-ink: #a8d0f5;
   }}
   *{{box-sizing:border-box;}}
   body{{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}}
@@ -244,6 +247,7 @@ TEMPLATE = """<!doctype html>
   .pill.red{{background:var(--red-soft);color:var(--red-ink);}}
   .pill.grey{{background:var(--grey-soft);color:var(--grey-ink);}}
   .pill.market{{background:var(--accent-soft);color:var(--accent);}}
+  .pill.funnel{{background:var(--blue-soft);color:var(--blue-ink);}}
   .pill.status{{background:var(--grey-soft);color:var(--grey-ink);}}
   .pill.dup-badge{{background:var(--accent-soft);color:var(--accent);}}
   .flag{{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}}
@@ -424,6 +428,14 @@ TEMPLATE = """<!doctype html>
         </div>
       </div>
       <div class="filter-group">
+        <span class="filter-label">Этап воронки:</span>
+        <div class="tabs" id="funnelTabs">{funnel_tabs}</div>
+        <div class="info-popover">
+          <button class="info-btn" id="funnelInfoBtn" type="button" aria-expanded="false" aria-label="Что означает каждый этап воронки">i</button>
+          <div class="info-pop" id="funnelPop" hidden>{funnel_pop}</div>
+        </div>
+      </div>
+      <div class="filter-group">
         <span class="filter-label">Оценка:</span>
         <div class="score-range">
           <div class="range-slider" id="scoreSlider">
@@ -444,7 +456,7 @@ TEMPLATE = """<!doctype html>
         </div>
         <button class="freshbtn" id="freshBtn" type="button" title="Показать сигналы, найденные за последние 7 дней">🆕 Свежак</button>
       </div>
-      <button class="reset-filters-btn" id="resetFiltersBtn" type="button" title="Сбросить рынок, группу источника, оценку и дату к значениям по умолчанию">↺ Сбросить фильтры</button>
+      <button class="reset-filters-btn" id="resetFiltersBtn" type="button" title="Сбросить рынок, группу источника, этап воронки, оценку и дату к значениям по умолчанию">↺ Сбросить фильтры</button>
     </div>
     <div class="sort" id="sort">
       Сортировка:
@@ -589,7 +601,7 @@ TEMPLATE = """<!doctype html>
 </script>
 {firebase_scripts}
 <script>
-  const state = {{ market: 'Все', color: 'Все', group: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все', focusFid: null }};
+  const state = {{ market: 'Все', color: 'Все', group: 'Все', funnel: 'Все', sort: 'score', scoreMin: 0, scoreMax: 5, dateFrom: '', dateTo: '', level: 1, l2: 'Все', focusFid: null }};
   const grid = document.getElementById('grid');
   const cards = () => Array.from(grid.querySelectorAll('.card'));
   const L2_COLOR = {{ out: 'grey', maybe: 'yellow', hot: 'green' }};
@@ -944,11 +956,12 @@ TEMPLATE = """<!doctype html>
         const matchMarket = state.market === 'Все' || c.dataset.market === state.market;
         const matchColor = state.level !== 1 || state.color === 'Все' || c.dataset.color === state.color;
         const matchGroup = state.group === 'Все' || c.dataset.group === state.group;
+        const matchFunnel = state.funnel === 'Все' || (c.dataset.funnel || '').split('|').includes(state.funnel);
         const score = parseFloat(c.dataset.score);
         const matchScore = isNaN(score) || (score >= state.scoreMin && score <= state.scoreMax);
         const d = c.dataset.date || '';
         const matchDate = (!state.dateFrom || !d || d >= state.dateFrom) && (!state.dateTo || !d || d <= state.dateTo);
-        show = levelMatch && l2Match && matchMarket && matchColor && matchGroup && matchScore && matchDate;
+        show = levelMatch && l2Match && matchMarket && matchColor && matchGroup && matchFunnel && matchScore && matchDate;
       }}
       c.classList.toggle('hidden', !show);
       if (show) visible++;
@@ -1006,6 +1019,13 @@ TEMPLATE = """<!doctype html>
     apply();
   }});
 
+  document.getElementById('funnelTabs').addEventListener('click', e => {{
+    if (!e.target.classList.contains('tab')) return;
+    state.funnel = e.target.dataset.funnel;
+    document.querySelectorAll('#funnelTabs .tab').forEach(t => t.classList.toggle('active', t === e.target));
+    apply();
+  }});
+
   document.getElementById('stats').addEventListener('click', e => {{
     const btn = e.target.closest('.stat');
     if (!btn) return;
@@ -1033,11 +1053,15 @@ TEMPLATE = """<!doctype html>
   const groupPop = document.getElementById('groupPop');
   const marketInfoBtn = document.getElementById('marketInfoBtn');
   const marketPop = document.getElementById('marketPop');
+  const funnelInfoBtn = document.getElementById('funnelInfoBtn');
+  const funnelPop = document.getElementById('funnelPop');
   togglePop(groupInfoBtn, groupPop);
   togglePop(marketInfoBtn, marketPop);
+  togglePop(funnelInfoBtn, funnelPop);
   document.addEventListener('click', e => {{
     if (!groupPop.contains(e.target) && e.target !== groupInfoBtn) groupPop.setAttribute('hidden', '');
     if (!marketPop.contains(e.target) && e.target !== marketInfoBtn) marketPop.setAttribute('hidden', '');
+    if (!funnelPop.contains(e.target) && e.target !== funnelInfoBtn) funnelPop.setAttribute('hidden', '');
   }});
 
   // ---- Диапазон оценки: два перекрывающихся range-инпута ----
@@ -1103,6 +1127,9 @@ TEMPLATE = """<!doctype html>
 
     state.group = 'Все';
     document.querySelectorAll('#groups .groupbtn').forEach(t => t.classList.toggle('active', t.dataset.group === 'Все'));
+
+    state.funnel = 'Все';
+    document.querySelectorAll('#funnelTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.funnel === 'Все'));
 
     scoreMinRange.value = 0; scoreMaxRange.value = 5;
     updateScoreUI();
@@ -1792,7 +1819,7 @@ def render_vote_row():
     )
 
 
-def render_card(row, color, idx, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary):
+def render_card(row, color, idx, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary, funnel_descriptions):
     market = row.get("market_guess", "") or "Не определено"
     status = row.get("status", "") or "new"
     confidence = row.get("confidence", "") or "—"
@@ -1806,9 +1833,13 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
     window_flag = in_window in ("false", "0", "нет")
 
     dups = duplicates_by_primary.get(hash_key(card_key(row)), [])
+    funnel_stages = [s.strip() for s in (row.get("funnel_stages") or "").split(";") if s.strip()]
 
     market_tip = html.escape(market_descriptions.get(market, ""))
     badges = f'<span class="pill market" tabindex="0" data-tip="{market_tip}">{html.escape(market)}</span>'
+    for stage in funnel_stages:
+        stage_tip = html.escape(funnel_descriptions.get(stage, ""))
+        badges += f'<span class="pill funnel" tabindex="0" data-tip="{stage_tip}">{html.escape(stage)}</span>'
     if group:
         group_sources = group_lookup.get(group, [])
         tip_parts = []
@@ -1834,8 +1865,9 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
     key = html.escape(card_key(row))
     has_breakdown = bool((row.get("criteria_scores") or "").strip())
 
+    funnel_attr = html.escape("|".join(funnel_stages))
     return f"""
-    <article class="card {color}" data-key="{key}" data-idx="{idx}" data-baked-color="{color}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-group="{html.escape(group)}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
+    <article class="card {color}" data-key="{key}" data-idx="{idx}" data-baked-color="{color}" data-orig-color="{color}" data-market="{html.escape(market)}" data-color="{color}" data-group="{html.escape(group)}" data-funnel="{funnel_attr}" data-score="{html.escape(str(score))}" data-date="{html.escape(row.get('source_date',''))}">
       <div class="card-top">
         <span class="pill {color}">{html.escape(str(score))}</span>
         <span class="pill status"{status_attrs}>{html.escape(status)}</span>
@@ -1874,6 +1906,7 @@ def build_signals_json(rows, colors):
             "color": color,
             "source_tier": row.get("source_tier", ""),
             "status": row.get("status", ""),
+            "funnel_stages": [s.strip() for s in (row.get("funnel_stages") or "").split(";") if s.strip()],
         })
     # экранируем "</" на случай спецсимволов в тексте, чтобы не оборвать <script>
     return json.dumps(signals, ensure_ascii=False).replace("</", "<\\/")
@@ -1946,7 +1979,14 @@ def build():
     rows = [r for r in all_rows if is_primary(r)]
     colors = [traffic_light(r.get("priority_score"), thresholds) for r in rows]
 
-    markets = sorted({r.get("market_guess", "Не определено") for r in rows})
+    # "Не определено" — не настоящий рынок, а отсутствие классификации,
+    # поэтому в фильтре он всегда идёт ПОСЛЕДНИМ, а не там, где случайно
+    # окажется по алфавиту (кириллица "Н" стоит перед "П" — без этого
+    # правила вкладка "Не определено" оказывалась перед "Подработка").
+    market_set = {r.get("market_guess", "Не определено") for r in rows}
+    markets = sorted(m for m in market_set if m != "Не определено")
+    if "Не определено" in market_set:
+        markets.append("Не определено")
     all_tabs = ["Все"] + (markets or ["Нет данных"])
     tabs_html = "".join(
         f'<button class="tab{" active" if m == "Все" else ""}" data-market="{html.escape(m)}">{html.escape(m)}</button>'
@@ -1960,6 +2000,17 @@ def build():
         f"<p><b>{html.escape(name)}:</b> {html.escape(desc)}</p>"
         for name, desc in market_descriptions.items() if name != "Не определено"
     ) or "<p>Рынки ещё не заданы в config/parameters.yaml -> markets</p>"
+
+    funnel_stages_cfg = cfg.get("funnel_stages", {}) or {}
+    funnel_descriptions = {name: (info or {}).get("description", "") for name, info in funnel_stages_cfg.items()}
+    funnel_tabs_html = '<button class="tab active" data-funnel="Все">Все</button>' + "".join(
+        f'<button class="tab" data-funnel="{html.escape(name)}">{html.escape(name)}</button>'
+        for name in funnel_stages_cfg.keys()
+    )
+    funnel_pop_html = "".join(
+        f"<p><b>{html.escape(name)}:</b> {html.escape(desc)}</p>"
+        for name, desc in funnel_descriptions.items()
+    ) or "<p>Этапы воронки ещё не заданы в config/parameters.yaml -> funnel_stages</p>"
 
     source_groups_cfg = cfg.get("source_groups", {}) or {}
     group_descriptions = {name: (info or {}).get("description", "") for name, info in source_groups_cfg.items()}
@@ -1987,7 +2038,7 @@ def build():
     ) or "<p class=\"note\">Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
     cards_html = "".join(
-        render_card(r, c, i, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary)
+        render_card(r, c, i, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary, funnel_descriptions)
         for i, (r, c) in enumerate(zip(rows, colors))
     ) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
@@ -2043,6 +2094,8 @@ def build():
             market_pop=market_pop_html,
             group_buttons=group_buttons_html,
             group_pop=group_pop_html,
+            funnel_tabs=funnel_tabs_html,
+            funnel_pop=funnel_pop_html,
             sub_markets=sub_markets_html,
             sub_groups=sub_groups_html,
             cards=cards_html,

@@ -10,6 +10,12 @@ analyze_signals.py — смысловой слой пайплайна.
 Python, как взвешенное среднее по весам из конфига — так результат
 воспроизводим и не зависит от того, умеет ли модель складывать числа.
 
+Тем же вызовом модель также относит сигнал к 1-2 этапам воронки ключевых
+метрик Авито.Работы (config/parameters.yaml -> funnel_stages) — отдельное
+от "рынка" измерение: рынок это ЧТО за продукт, этап воронки — на КАКУЮ
+бизнес-метрику сигнал должен повлиять (рост соискателей/работодателей,
+вовлечённость, конверсия в наём, монетизация).
+
 Тем же вызовом модель также определяет, не является ли сигнал дублем
 уже существующей в бэклоге истории (см. _dedup_candidates/_resolve_
 cluster_id ниже) — раньше дедуп в пайплайне был только по точному
@@ -51,18 +57,20 @@ BACKLOG_PATH = ROOT / "data" / "backlog.csv"
 DEDUP_LOOKBACK_DAYS = 45
 DEDUP_MAX_CANDIDATES = 80
 
-# ВАЖНО: source_tier и criteria_scores дописаны в КОНЕЦ списка, а не
-# вставлены между старыми полями. Если у вас уже есть накопленный
-# data/backlog.csv из прошлых запусков — правьте только первую строку
-# (заголовок), добавив ",source_tier,criteria_scores" в конец; сами
-# строки с данными трогать не нужно. Если вставить новые поля в
-# середину списка, новые и старые строки в одном файле начнут читаться
-# со сдвигом колонок — так делать не надо.
+# ВАЖНО: source_tier, criteria_scores и funnel_stages дописаны в КОНЕЦ
+# списка, а не вставлены между старыми полями. Если у вас уже есть
+# накопленный data/backlog.csv из прошлых запусков — правьте только
+# первую строку (заголовок), добавив недостающие имена в конец (например
+# ",funnel_stages", если остальные уже были дописаны раньше); сами строки
+# с данными трогать не нужно. Если вставить новые поля в середину списка,
+# новые и старые строки в одном файле начнут читаться со сдвигом колонок
+# — так делать не надо.
 FIELDNAMES = [
     "date_found", "source_url", "source_date", "in_target_window",
     "market_guess", "title", "fact", "interpretation", "cluster_id",
     "opportunity_hypothesis", "priority_score", "confidence",
     "key_unknowns", "status", "source_tier", "criteria_scores",
+    "funnel_stages",
 ]
 
 PROMPT_TEMPLATE = """Ты аналитик роста в Авито.Работе. Три рынка компании:
@@ -77,6 +85,12 @@ PROMPT_TEMPLATE = """Ты аналитик роста в Авито.Работе
   Авито.Работы, привязанная к одному из трёх рынков
 - "criteria_scores": JSON-объект с оценкой от 1 до 5 (целое число) по
   КАЖДОМУ из следующих критериев, все ключи обязательны: {criteria_keys}
+- "funnel_stages": список из 1-2 названий этапов воронки Авито.Работы (взять
+  ТОЛЬКО из списка ниже, дословно, как написано) — на какую метрику бизнеса
+  этот сигнал влияет сильнее всего. Это отдельное измерение от рынка: рынок
+  — это ЧТО за продукт, этап воронки — на КАКУЮ метрику он должен повлиять.
+  Этапы воронки:
+{funnel_stages_block}
 - "confidence": одно из "низкая", "средняя", "высокая"
 - "key_unknowns": 2-3 главных открытых вопроса одной строкой через "; "
 - "duplicate_of_index": номер сигнала из списка "Уже в бэклоге" ниже,
@@ -149,13 +163,39 @@ def _resolve_cluster_id(raw_index, candidates, all_rows):
     return target_cluster_id
 
 
-def call_llm(client, model, item, weights, candidates):
+def _format_funnel_stages_block(funnel_stages_cfg):
+    if not funnel_stages_cfg:
+        return "  (не заданы в config/parameters.yaml -> funnel_stages — верни пустой список)"
+    return "\n".join(
+        f'  - "{name}" — {(info or {}).get("description", "")}'
+        for name, info in funnel_stages_cfg.items()
+    )
+
+
+def _resolve_funnel_stages(raw_value, funnel_stages_cfg):
+    """Модель должна вернуть список ровно из названий, заданных в config ->
+    funnel_stages. Всё, что не совпадает дословно с известным названием,
+    молча отбрасывается (опечатка модели не должна ронять весь анализ) —
+    сохраняем как одну строку через "; ", как key_unknowns."""
+    known = set(funnel_stages_cfg or {})
+    if not raw_value:
+        return ""
+    if isinstance(raw_value, str):
+        raw_value = [raw_value]
+    if not isinstance(raw_value, list):
+        return ""
+    picked = [str(v).strip() for v in raw_value if str(v).strip() in known]
+    return "; ".join(dict.fromkeys(picked))  # dict.fromkeys — убрать дубли, сохранив порядок
+
+
+def call_llm(client, model, item, weights, candidates, funnel_stages_cfg):
     prompt = PROMPT_TEMPLATE.format(
         criteria_keys=", ".join(weights.keys()),
         source_name=item["source_name"],
         title=item["title"],
         snippet=item["snippet"],
         candidates_block=_format_candidates(candidates),
+        funnel_stages_block=_format_funnel_stages_block(funnel_stages_cfg),
     )
     resp = client.messages.create(
         model=model,
@@ -203,6 +243,7 @@ def analyze():
         return
 
     weights = cfg["priority_weights"]
+    funnel_stages_cfg = cfg.get("funnel_stages", {}) or {}
 
     # Читаем весь текущий бэклог в память (а не дописываем построчно, как
     # раньше) — нужно, чтобы при обнаружении дубля можно было проставить
@@ -218,7 +259,7 @@ def analyze():
     for item in items:
         candidates = _dedup_candidates(all_rows)
         try:
-            result = call_llm(client, model, item, weights, candidates)
+            result = call_llm(client, model, item, weights, candidates, funnel_stages_cfg)
         except Exception as e:
             print(f"Пропуск '{item['title']}': ошибка LLM ({e})")
             continue
@@ -247,6 +288,7 @@ def analyze():
             "confidence": result.get("confidence", ""),
             "key_unknowns": result.get("key_unknowns", ""),
             "status": "new",
+            "funnel_stages": _resolve_funnel_stages(result.get("funnel_stages"), funnel_stages_cfg),
         })
         note = " — похоже, дубль уже известной истории" if cluster_id else ""
         print(f"Добавлено: {item['title']} (score={score}){note}")
