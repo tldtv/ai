@@ -481,6 +481,27 @@ TEMPLATE = """<!doctype html>
         <button class="tab" data-days="0" type="button">Без ограничения</button>
       </div>
 
+      <div class="admin-section-title">Когда присылать</div>
+      <div class="tabs" id="subTiming">
+        <button class="tab active" data-timing="asap" type="button">Как только появится новое</button>
+        <button class="tab" data-timing="scheduled" type="button">В своё время</button>
+      </div>
+      <div id="subTimingScheduled" style="margin-top:8px;" hidden>
+        <div class="admin-row"><label>День недели</label>
+          <select id="subWeekday">
+            <option value="0">Понедельник</option>
+            <option value="1">Вторник</option>
+            <option value="2">Среда</option>
+            <option value="3">Четверг</option>
+            <option value="4">Пятница</option>
+            <option value="5">Суббота</option>
+            <option value="6">Воскресенье</option>
+          </select>
+        </div>
+        <div class="admin-row"><label>Время (МСК)</label><select id="subHour"></select></div>
+        <p class="note" style="margin:6px 0 0;">Точность — примерно ±20 минут (расписание проверяется каждые ~20 минут). Если к выбранному моменту новых сигналов ещё нет, письмо придёт при следующей подходящей проверке.</p>
+      </div>
+
       <div class="admin-actions">
         <span class="admin-status" id="subStatus"></span>
         <button type="button" id="subCancel">Закрыть</button>
@@ -1218,6 +1239,31 @@ TEMPLATE = """<!doctype html>
     document.querySelectorAll('#subRecency .tab').forEach(t => t.classList.toggle('active', t === e.target));
   }});
 
+  // "Когда присылать" — по умолчанию письмо уходит, как только появляется
+  // что-то новое под фильтры (старое поведение, без изменений). "В своё
+  // время" — send_digest.py (should_send_now) сверяет день недели/час по
+  // Москве с preferred_weekday/preferred_hour и до этого момента просто
+  // молчит, даже если новые сигналы уже есть — see README про точность
+  // ~20 минут (расписание проверяется настолько часто).
+  let subTimingMode = 'asap';
+  const subTimingScheduled = document.getElementById('subTimingScheduled');
+  document.getElementById('subTiming').addEventListener('click', e => {{
+    if (!e.target.classList.contains('tab')) return;
+    subTimingMode = e.target.dataset.timing;
+    document.querySelectorAll('#subTiming .tab').forEach(t => t.classList.toggle('active', t === e.target));
+    subTimingScheduled.hidden = subTimingMode !== 'scheduled';
+  }});
+  const subWeekdaySelect = document.getElementById('subWeekday');
+  const subHourSelect = document.getElementById('subHour');
+  for (let h = 0; h < 24; h++) {{
+    const opt = document.createElement('option');
+    opt.value = String(h);
+    opt.textContent = String(h).padStart(2, '0') + ':00';
+    if (h === 9) opt.selected = true; // по умолчанию — время основного еженедельного обновления (09:00 МСК)
+    subHourSelect.appendChild(opt);
+  }}
+  const WEEKDAY_DATIVE = ['понедельникам', 'вторникам', 'средам', 'четвергам', 'пятницам', 'субботам', 'воскресеньям'];
+
   subSave.addEventListener('click', () => {{
     if (!db) {{
       subStatus.textContent = 'Firebase не настроен на этом дашборде — подписка недоступна.';
@@ -1240,6 +1286,10 @@ TEMPLATE = """<!doctype html>
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     }};
     if (subChannel === 'email') payload.email = email;
+    if (subTimingMode === 'scheduled') {{
+      payload.preferred_weekday = parseInt(subWeekdaySelect.value, 10);
+      payload.preferred_hour = parseInt(subHourSelect.value, 10);
+    }}
 
     subSave.disabled = true;
     subStatus.classList.remove('confirmed');
@@ -1261,7 +1311,15 @@ TEMPLATE = """<!doctype html>
           subStatus.classList.add('confirmed');
           window.open(link, '_blank');
         }} else {{
-          subStatus.textContent = '✅ Готово! Первое письмо придёт уже сегодня и далее будем присылать свежие сигналы по вашим фильтрам раз в неделю.';
+          let msg = '✅ Готово! Первое письмо придёт уже сегодня';
+          if (subTimingMode === 'scheduled') {{
+            const wd = WEEKDAY_DATIVE[parseInt(subWeekdaySelect.value, 10)];
+            const hh = subHourSelect.value.padStart(2, '0');
+            msg += `, а дальше — по ${{wd}} в ${{hh}}:00 (МСК), как только будет что прислать`;
+          }} else {{
+            msg += ' и далее будем присылать свежие сигналы по вашим фильтрам раз в неделю';
+          }}
+          subStatus.textContent = msg + '.';
           subStatus.classList.add('confirmed');
         }}
         subSave.disabled = false;

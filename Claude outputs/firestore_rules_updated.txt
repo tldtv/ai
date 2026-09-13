@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Ручные правки оценки по критериям (пересчёт итога — на клиенте)
+    match /signal_overrides/{fid} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['overrides', 'updated_at'])
+        && request.resource.data.overrides is map;
+    }
+
+    // Комментарии — подколлекция на сигнал. Создать может только анонимно
+    // вошедший (Authentication -> Sign-in method -> Anonymous), с полем
+    // author_uid, равным его собственному uid; удалить — только тот же
+    // author_uid, то есть каждый может удалить исключительно свои
+    // комментарии (проверяется здесь, на сервере, а не в интерфейсе).
+    match /signal_comments/{fid}/items/{itemId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['text', 'created_at', 'author_uid'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.author_uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.author_uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Голосование за переход на 2-й уровень
+    match /signal_votes/{fid} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(['out', 'maybe', 'hot', 'level2_status', 'promoted_at'])
+        && request.resource.data.out is int
+        && request.resource.data.maybe is int
+        && request.resource.data.hot is int;
+    }
+
+    // Админ-панель — "живые" оверрайды порогов/весов/голосов/каденса
+    match /admin_config/config {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasOnly(
+        ['green_min', 'yellow_min', 'votes_to_promote', 'update_cadence_days', 'weights', 'updated_at']
+      ) && request.resource.data.weights is map;
+    }
+
+    // Подписки на еженедельную рассылку (форма подписки на дашборде,
+    // src/build_dashboard.py, и отправка — src/send_digest.py в GitHub
+    // Actions через служебный Firebase-аккаунт, у которого свой отдельный
+    // полный доступ через Admin SDK — правила ниже на него НЕ действуют,
+    // они только про то, что разрешено делать из обычного браузера).
+    //
+    // read: намеренно запрещено всем — иначе email/Telegram id подписчиков
+    // можно было бы прочитать через devtools прямо на странице дашборда.
+    // create: разрешено всем (это и есть форма подписки) — но только с
+    // ожидаемым набором полей и без служебных полей, которые должен
+    // выставлять только send_digest.py (telegram_chat_id, unsubscribed,
+    // last_digest_at).
+    // update: разрешено только одно конкретное действие — отписка по
+    // ссылке вида ?unsub=<id подписки> из письма/telegram-сообщения,
+    // то есть выставление unsubscribed=true и ничего больше (нельзя ни
+    // прочитать чужую подписку, ни поменять в ней что-то ещё, ни снова
+    // включить её ("отписаться" необратимо с клиента — новая подписка
+    // оформляется заново через форму)).
+    // delete: запрещено (не даёт правило ниже — delete отдельно не
+    // объявлен, поэтому Firestore по умолчанию его блокирует).
+    match /digest_subscriptions/{subId} {
+      allow read: if false;
+      allow create: if request.resource.data.keys().hasOnly(
+          ['channel', 'email', 'markets', 'groups', 'colors', 'recency_days', 'created_at',
+           'preferred_weekday', 'preferred_hour']
+        )
+        && request.resource.data.channel in ['email', 'telegram']
+        && request.resource.data.markets is list
+        && request.resource.data.groups is list
+        && request.resource.data.colors is list
+        && request.resource.data.recency_days is int
+        // preferred_weekday/preferred_hour необязательны (форма "Когда
+        // присылать" -> "Как только появится новое" их вообще не отправляет) —
+        // .get(key, 0) подставляет 0, если поля нет, поэтому проверка типа
+        // проходит и для этого случая, и для реально переданного числа.
+        && request.resource.data.get('preferred_weekday', 0) is int
+        && request.resource.data.get('preferred_hour', 0) is int
+        && (request.resource.data.channel != 'email' || request.resource.data.email is string);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unsubscribed'])
+        && request.resource.data.unsubscribed == true;
+    }
+  }
+}

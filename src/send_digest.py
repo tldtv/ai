@@ -3,7 +3,13 @@ send_digest.py — еженедельная рассылка новых сигн
 подписчикам (email через Resend, Telegram через Bot API).
 
 Запускается из .github/workflows/weekly_signal_scan.yml сразу после
-build_dashboard.py, тем же еженедельным расписанием (см. README).
+build_dashboard.py (еженедельное обновление бэклога), а также отдельно
+из .github/workflows/digest_welcome.yml каждые ~20 минут — второй
+запуск нужен, чтобы (а) новый подписчик получил приветственное письмо
+сразу, не дожидаясь понедельника, и (б) у каждого подписчика реально
+сработало выбранное им время получения обычных писем (should_send_now
+ниже) — фактическая отправка кому угодно, кроме самого первого письма,
+может произойти в любой из этих запусков, а не только в еженедельном.
 
 Почему это единственная часть пайплайна, которой нужен служебный
 Firebase-аккаунт (Service Account), а не просто публичный конфиг из
@@ -30,7 +36,7 @@ SDK есть доступ в обход правил.
 import html
 import json
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -162,21 +168,47 @@ def matches_subscription(row, sub, cadence_days):
         if not d or d < date.today() - timedelta(days=recency_days):
             return False
 
-    # Дедупликация между рассылками: сигнал показываем не раньше, чем
-    # он появился в бэклоге (date_found), и не позже последней успешной
-    # отправки этому подписчику — иначе один и тот же сигнал придёт
-    # снова на следующей неделе, пока не «состарится» по recency_days.
-    # Для ещё ни разу не отправлявшейся подписки история ограничена
-    # update_cadence_days (по умолчанию 7) — чтобы первое письмо не
-    # вываливало весь исторический бэклог целиком.
+    # Дедупликация между рассылками: сигнал показываем, только если он
+    # появился в бэклоге (date_found) СТРОГО ПОСЛЕ последнего письма,
+    # отправленного этому подписчику, — без верхнего ограничения "не
+    # старше N дней", даже если писем не было давно (например, подписчик
+    # выбрал редкое время присылать — см. should_send_now). Для ещё ни
+    # разу не отправлявшейся подписки история ограничена update_cadence_days
+    # (по умолчанию 7) — чтобы самое первое письмо не вываливало весь
+    # исторический бэклог целиком.
     found = _parse_date(row.get("date_found"))
     if not found:
         return False
-    cutoff = date.today() - timedelta(days=cadence_days)
     last_sent = sub.get("last_digest_at")
-    since = last_sent.date() if last_sent else None
-    effective_since = max(since, cutoff) if since else cutoff
-    return found > effective_since
+    since = last_sent.date() if last_sent else date.today() - timedelta(days=cadence_days)
+    return found > since
+
+
+MOSCOW_OFFSET = timedelta(hours=3)  # Europe/Moscow, без перехода на летнее время с 2014 года
+
+
+def should_send_now(sub, now=None):
+    """Гейт для НЕ-приветственных (повторных) отправок — если подписчик
+    указал в форме подписки предпочтительные день недели/час (см. форму
+    "Когда присылать" на дашборде), шлём только когда по московскому
+    времени сейчас именно этот день и час, а всё остальное время просто
+    молчим для этого подписчика (даже если matches_subscription уже
+    нашёл что отправить — оно никуда не денется, отправится в нужный
+    момент). Без предпочтения (оба поля не заданы) — ведём себя как
+    раньше, отправляем как только появляется что-то новое. Проверяется с
+    точностью до часа, а не минуты — этот скрипт гоняется по расписанию
+    примерно раз в ~20 минут (см. digest_welcome.yml), поэтому более
+    точный выбор времени всё равно не имел бы смысла."""
+    weekday = sub.get("preferred_weekday")
+    hour = sub.get("preferred_hour")
+    if weekday is None and hour is None:
+        return True
+    now = now or (datetime.now(timezone.utc) + MOSCOW_OFFSET)
+    if weekday is not None and now.weekday() != int(weekday):
+        return False
+    if hour is not None and now.hour != int(hour):
+        return False
+    return True
 
 
 def group_for_output(rows):
@@ -489,10 +521,22 @@ def main():
 
     resend_key = os.environ.get("RESEND_API_KEY")
 
-    sent = skipped_no_match = skipped_no_key = skipped_unconfirmed = 0
+    sent = skipped_no_match = skipped_no_key = skipped_unconfirmed = skipped_not_time = 0
     for doc in db.collection("digest_subscriptions").stream():
         sub = doc.to_dict() or {}
         if sub.get("unsubscribed"):
+            continue
+
+        # Подписчику, для которого это первая когда-либо отправленная рассылка
+        # (last_digest_at ещё не выставлен), шлём приветственный вариант текста —
+        # это и есть "первое сообщение в момент подписки" (см. digest_welcome.yml,
+        # который гоняет этот же main() каждые ~20 минут, чтобы такой подписчик
+        # не ждал ближайшего понедельника). Приветственное письмо уходит сразу,
+        # даже если подписчик указал свои день/час — should_send_now действует
+        # только на все последующие письма.
+        is_welcome = not sub.get("last_digest_at")
+        if not is_welcome and not should_send_now(sub):
+            skipped_not_time += 1
             continue
 
         matched = [r for r in rows if matches_subscription(r, sub, cadence_days)]
@@ -500,12 +544,6 @@ def main():
             skipped_no_match += 1
             continue
 
-        # Подписчику, для которого это первая когда-либо отправленная рассылка
-        # (last_digest_at ещё не выставлен), шлём приветственный вариант текста —
-        # это и есть "первое сообщение в момент подписки" (см. digest_welcome.yml,
-        # который гоняет этот же main() каждые ~20 минут, чтобы такой подписчик
-        # не ждал ближайшего понедельника).
-        is_welcome = not sub.get("last_digest_at")
         unsub_url = f"{dashboard_url}?unsub={doc.id}" if dashboard_url else ""
 
         channel = sub.get("channel")
@@ -543,6 +581,7 @@ def main():
 
     print(
         f"Разослано: {sent}. Пропущено — нет новых сигналов под фильтр: {skipped_no_match}, "
+        f"не подошло время подписчика: {skipped_not_time}, "
         f"не подтверждена Telegram-подписка: {skipped_unconfirmed}, нет ключа API: {skipped_no_key}."
     )
 
