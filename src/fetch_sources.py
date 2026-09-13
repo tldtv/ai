@@ -25,6 +25,15 @@ fetch_sources.py — механический слой пайплайна.
 
 Результат — data/_new_raw_signals.json: список новых, ещё не обработанных
 сигналов, которые дальше передаются в analyze_signals.py.
+
+В конце печатается таблица по каждому источнику отдельно (в ленте всего /
+уже видели / отброшено по дате / мимо ключевых слов рынка / оставлено) —
+по ней видно, на каком именно шаге источник перестал давать сигналы,
+включая явную пометку, если feedparser вообще не смог разобрать ленту или
+она вернула ноль записей (например, сайт блокирует запросы с IP GitHub
+Actions, url в config устарел и т.п.) — раньше такой источник просто молча
+не давал ни одного сигнала, неотличимо от "у него правда сейчас нет ничего
+по теме".
 """
 import argparse
 import csv
@@ -87,13 +96,36 @@ def fetch(mode="weekly", start=None, end=None):
 
     new_items = []
     skipped_by_date = 0
+    # Диагностика по КАЖДОМУ источнику отдельно — без этого молчаливый сбой
+    # одного источника (лента не отдаёт записей, блокирует запросы с IP
+    # GitHub Actions, битый URL и т.п.) неотличим от него же просто "у него
+    # сейчас нет новых статей по теме": в обоих случаях источник тихо не
+    # даёт ни одного сигнала. per_source ниже печатается в конце — по этой
+    # таблице сразу видно, на каком именно шаге отсеялся конкретный источник
+    # (feedparser вообще ничего не вернул / всё уже видели / всё старше
+    # weekly_recency_days / ни одна статья не прошла по ключевым словам
+    # рынка) — так эту причину можно найти без доступа к логам самого
+    # workflow.
+    per_source = {}
     for src in cfg["sources"]:
         if src.get("type") != "rss" or not src.get("url"):
             continue  # источник без подтверждённого RSS — впишите url в config
+        stats = per_source.setdefault(src["name"], {
+            "group": src.get("group"), "fetched": 0, "bozo": None,
+            "skip_known": 0, "skip_date": 0, "skip_market": 0, "kept": 0,
+        })
         parsed = feedparser.parse(src["url"])
+        stats["fetched"] = len(parsed.entries)
+        # bozo=1 — feedparser не смог нормально распарсить ответ (не тот
+        # Content-Type, битый XML, HTTP-ошибка вместо ленты и т.п.) — сам
+        # факт этого стоит напечатать, даже если entries при этом не пустой
+        # (иногда feedparser всё равно восстанавливает часть записей).
+        if getattr(parsed, "bozo", 0):
+            stats["bozo"] = repr(parsed.get("bozo_exception"))
         for entry in parsed.entries:
             url = entry.get("link")
             if not url or url in known_urls:
+                stats["skip_known"] += 1
                 continue
 
             pub_raw = entry.get("published") or entry.get("updated")
@@ -114,10 +146,12 @@ def fetch(mode="weekly", start=None, end=None):
                 pub_date = pub_dt.date() if isinstance(pub_dt, datetime) else pub_dt
                 if not pub_date or (today - pub_date).days > weekly_recency_days:
                     skipped_by_date += 1
+                    stats["skip_date"] += 1
                     continue
             elif mode == "backfill":
                 if not in_window(pub_dt, start, end):
                     skipped_by_date += 1
+                    stats["skip_date"] += 1
                     continue
 
             title = entry.get("title", "")
@@ -134,6 +168,7 @@ def fetch(mode="weekly", start=None, end=None):
             # config/parameters.yaml -> markets. Отключается одной строкой
             # в конфиге, если важнее не упустить ничего.
             if require_market_match and market_guess == "Не определено":
+                stats["skip_market"] += 1
                 continue
 
             item = {
@@ -147,11 +182,22 @@ def fetch(mode="weekly", start=None, end=None):
                 "in_target_window": in_window(pub_dt, start, end),
             }
             new_items.append(item)
+            stats["kept"] += 1
 
     OUT_PATH.write_text(json.dumps(new_items, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Найдено новых сигналов: {len(new_items)} -> {OUT_PATH}")
     if skipped_by_date:
         print(f"Отброшено по дате (стоимостная защита, режим {mode}): {skipped_by_date}")
+
+    print("По источникам (в ленте всего / уже видели / отброшено по дате / мимо рынка / оставлено):")
+    for name, s in per_source.items():
+        bozo_note = f" [ОШИБКА РАЗБОРА ЛЕНТЫ: {s['bozo']}]" if s["bozo"] else ""
+        empty_note = " [лента вернула 0 записей — проверьте url в config или доступность сайта]" if s["fetched"] == 0 else ""
+        print(
+            f"  {name} ({s['group']}): {s['fetched']} / {s['skip_known']} / "
+            f"{s['skip_date']} / {s['skip_market']} / {s['kept']}{bozo_note}{empty_note}"
+        )
+
     return new_items
 
 
