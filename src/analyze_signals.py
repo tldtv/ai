@@ -256,12 +256,16 @@ def analyze():
             all_rows = list(csv.DictReader(f))
 
     duplicates_found = 0
+    failed = 0
+    last_error = None
     for item in items:
         candidates = _dedup_candidates(all_rows)
         try:
             result = call_llm(client, model, item, weights, candidates, funnel_stages_cfg)
         except Exception as e:
-            print(f"Пропуск '{item['title']}': ошибка LLM ({e})")
+            failed += 1
+            last_error = e
+            print(f"Пропуск '{item['title']}': ошибка LLM ({type(e).__name__}: {e})")
             continue
 
         criteria_scores = result.get("criteria_scores", {})
@@ -300,6 +304,24 @@ def analyze():
 
     if duplicates_found:
         print(f"Найдено и сгруппировано дублей: {duplicates_found}")
+
+    succeeded = len(items) - failed
+    print(f"Обработано: {succeeded} из {len(items)} успешно" + (f", ошибок: {failed}" if failed else ""))
+
+    # КРИТИЧНО: если ошиблись АБСОЛЮТНО все сигналы — это почти наверняка
+    # системная проблема (неверный/отключённый API-ключ, исчерпан лимит
+    # расходов, не проходит формат ответа модели), а не просто "не повезло
+    # с одной статьёй". Раньше в этом случае скрипт всё равно завершался
+    # успешно (exit code 0) и просто переписывал backlog.csv без единой
+    # новой строки — GitHub Actions показывал зелёную галочку "Success",
+    # хотя пайплайн по факту не сделал ничего. Явно роняем прогон, чтобы
+    # это стало красным крестиком и точным текстом ошибки в логе, а не
+    # молчаливой отпиской через print().
+    if failed and succeeded == 0:
+        raise SystemExit(
+            f"Все {failed} сигналов не прошли анализ — ни одного не добавлено. "
+            f"Последняя ошибка ({type(last_error).__name__}): {last_error}"
+        )
 
 
 if __name__ == "__main__":
