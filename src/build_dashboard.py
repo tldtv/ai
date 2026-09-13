@@ -99,6 +99,7 @@ TEMPLATE = """<!doctype html>
     --red: #c0392b;      --red-soft: #fbe1de;    --red-ink: #96291b;
     --grey: #8a8f96;     --grey-soft: #eceded;   --grey-ink: #5c6066;
     --blue: #2f6fa8;     --blue-soft: #e2eef7;   --blue-ink: #1f4f78;
+    --tooltip-ink: #fff;
   }}
   /* Тёмная тема — переключатель в панели настроек (⚙️ -> "Оформление"),
      хранится в localStorage у каждого посетителя отдельно, ни с кем не
@@ -124,6 +125,7 @@ TEMPLATE = """<!doctype html>
       --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
       --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
       --blue: #6badea;     --blue-soft: #182636;   --blue-ink: #a8d0f5;
+      --tooltip-ink: #1a1a1a;
     }}
   }}
   :root[data-theme="dark"] {{
@@ -138,6 +140,7 @@ TEMPLATE = """<!doctype html>
     --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
     --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
     --blue: #6badea;     --blue-soft: #182636;   --blue-ink: #a8d0f5;
+    --tooltip-ink: #1a1a1a;
   }}
   *{{box-sizing:border-box;}}
   body{{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}}
@@ -161,7 +164,11 @@ TEMPLATE = """<!doctype html>
     top:100%;
     margin-top:6px;
     background:var(--ink);
-    color:#fff;
+    color:var(--tooltip-ink);  /* фон тултипа = var(--ink), а в тёмной теме
+    var(--ink) сам становится светлым (это основной цвет текста страницы,
+    он инвертируется) — из-за этого фикс белый цвет текста тултипа сливался
+    с таким же светлым фоном; поэтому цвет текста тоже переменная,
+    инвертированная отдельно под тултип */
     padding:7px 10px;
     border-radius:7px;
     font-size:11px;
@@ -428,10 +435,10 @@ TEMPLATE = """<!doctype html>
         </div>
       </div>
       <div class="filter-group">
-        <span class="filter-label">Этап воронки:</span>
+        <span class="filter-label">Влияние:</span>
         <div class="tabs" id="funnelTabs">{funnel_tabs}</div>
         <div class="info-popover">
-          <button class="info-btn" id="funnelInfoBtn" type="button" aria-expanded="false" aria-label="Что означает каждый этап воронки">i</button>
+          <button class="info-btn" id="funnelInfoBtn" type="button" aria-expanded="false" aria-label="Что означает каждый вариант влияния">i</button>
           <div class="info-pop" id="funnelPop" hidden>{funnel_pop}</div>
         </div>
       </div>
@@ -456,7 +463,7 @@ TEMPLATE = """<!doctype html>
         </div>
         <button class="freshbtn" id="freshBtn" type="button" title="Показать сигналы, найденные за последние 7 дней">🆕 Свежак</button>
       </div>
-      <button class="reset-filters-btn" id="resetFiltersBtn" type="button" title="Сбросить рынок, группу источника, этап воронки, оценку и дату к значениям по умолчанию">↺ Сбросить фильтры</button>
+      <button class="reset-filters-btn" id="resetFiltersBtn" type="button" title="Сбросить рынок, группу источника, влияние, оценку и дату к значениям по умолчанию">↺ Сбросить фильтры</button>
     </div>
     <div class="sort" id="sort">
       Сортировка:
@@ -2010,7 +2017,7 @@ def build():
     funnel_pop_html = "".join(
         f"<p><b>{html.escape(name)}:</b> {html.escape(desc)}</p>"
         for name, desc in funnel_descriptions.items()
-    ) or "<p>Этапы воронки ещё не заданы в config/parameters.yaml -> funnel_stages</p>"
+    ) or "<p>Варианты влияния ещё не заданы в config/parameters.yaml -> funnel_stages</p>"
 
     source_groups_cfg = cfg.get("source_groups", {}) or {}
     group_descriptions = {name: (info or {}).get("description", "") for name, info in source_groups_cfg.items()}
