@@ -10,7 +10,20 @@ analyze_signals.py — смысловой слой пайплайна.
 Python, как взвешенное среднее по весам из конфига — так результат
 воспроизводим и не зависит от того, умеет ли модель складывать числа.
 
-Результат дописывается в data/backlog.csv.
+Тем же вызовом модель также определяет, не является ли сигнал дублем
+уже существующей в бэклоге истории (см. _dedup_candidates/_resolve_
+cluster_id ниже) — раньше дедуп в пайплайне был только по точному
+совпадению URL (fetch_sources.py), из-за чего одна и та же новость с
+разных источников (например, vc.ru и TechCrunch про одно и то же
+событие) заводила отдельные строки в бэклоге. Теперь такие дубли
+получают общий cluster_id — build_dashboard.py схлопывает их в одну
+карточку, а send_digest.py не шлёт дубли в рассылке.
+
+Результат дописывается в data/backlog.csv (точнее — весь файл
+перезаписывается целиком на каждый запуск, а не дописывается построчно,
+как раньше: это нужно, чтобы при обнаружении дубля можно было задним
+числом проставить cluster_id и уже существующей строке, если та ещё не
+была частью кластера).
 
 Требует переменную окружения ANTHROPIC_API_KEY (в GitHub Actions —
 секрет репозитория: Settings -> Secrets and variables -> Actions).
@@ -18,16 +31,25 @@ Python, как взвешенное среднее по весам из конф
 import csv
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import yaml
 from anthropic import Anthropic
 
+from signal_id import hash_key, card_key
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "parameters.yaml"
 NEW_SIGNALS_PATH = ROOT / "data" / "_new_raw_signals.json"
 BACKLOG_PATH = ROOT / "data" / "backlog.csv"
+
+# Окно и лимит кандидатов для проверки на дубль (см. _dedup_candidates) —
+# ограничены, чтобы промпт не раздувался по мере роста бэклога: повтор
+# истории месячной давности маловероятен, а лишние токены на КАЖДЫЙ
+# анализируемый сигнал складываются в заметную сумму.
+DEDUP_LOOKBACK_DAYS = 45
+DEDUP_MAX_CANDIDATES = 80
 
 # ВАЖНО: source_tier и criteria_scores дописаны в КОНЕЦ списка, а не
 # вставлены между старыми полями. Если у вас уже есть накопленный
@@ -57,12 +79,22 @@ PROMPT_TEMPLATE = """Ты аналитик роста в Авито.Работе
   КАЖДОМУ из следующих критериев, все ключи обязательны: {criteria_keys}
 - "confidence": одно из "низкая", "средняя", "высокая"
 - "key_unknowns": 2-3 главных открытых вопроса одной строкой через "; "
+- "duplicate_of_index": номер сигнала из списка "Уже в бэклоге" ниже,
+  если этот сигнал — явно про ТО ЖЕ САМОЕ событие/историю, что и один
+  из них (даже если заголовок сформулирован иначе, короче/длиннее или
+  на другом языке — например, одну и ту же новость независимо написали
+  vc.ru и TechCrunch). Иначе — null. Похожая, но НЕ идентичная тема
+  (например, два разных раунда инвестиций одной компании, или две
+  разные компании в одной нише) — это НЕ дубль, ставь null.
 
 Верни ТОЛЬКО JSON, без пояснений вокруг и без markdown-обёртки.
 
 Источник: {source_name}
 Заголовок: {title}
 Текст: {snippet}
+
+Уже в бэклоге (номер: заголовок) — используй для duplicate_of_index:
+{candidates_block}
 """
 
 
@@ -70,12 +102,60 @@ def load_config():
     return yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
-def call_llm(client, model, item, weights):
+def _dedup_candidates(all_rows):
+    """Строки бэклога, которые стоит показать модели как потенциальные
+    "оригиналы" для проверки на дубль — только не старше DEDUP_LOOKBACK_
+    DAYS и не больше DEDUP_MAX_CANDIDATES штук (см. комментарий у
+    констант). Возвращает список (индекс_в_all_rows, строка)."""
+    cutoff = date.today() - timedelta(days=DEDUP_LOOKBACK_DAYS)
+    picked = []
+    for i, row in enumerate(all_rows):
+        try:
+            found = date.fromisoformat((row.get("date_found") or "").strip())
+        except ValueError:
+            found = None
+        if found is None or found >= cutoff:
+            picked.append((i, row))
+    return picked[-DEDUP_MAX_CANDIDATES:]
+
+
+def _format_candidates(candidates):
+    if not candidates:
+        return "(бэклог пуст или все сигналы в нём старше 45 дней — дублей быть не может, ставь null)"
+    return "\n".join(f"{i}: {row.get('title', '')}" for i, row in candidates)
+
+
+def _resolve_cluster_id(raw_index, candidates, all_rows):
+    """Если модель уверенно указала индекс существующей строки как дубль —
+    возвращает cluster_id для НОВОЙ строки. Если у найденной существующей
+    строки ещё не было cluster_id (она ещё не была частью кластера), она
+    мутируется на месте (all_rows[idx] — тот же объект, что и в общем
+    списке) и получает cluster_id, равный её же fid — тем самым становясь
+    "главной" в новом кластере из двух строк; все дальнейшие дубли этой
+    же истории в этом и следующих запусках будут ссылаться на тот же id."""
+    if raw_index is None:
+        return ""
+    try:
+        idx = int(raw_index)
+    except (TypeError, ValueError):
+        return ""
+    if idx not in {i for i, _ in candidates}:
+        return ""  # модель указала индекс не из предложенного списка — игнорируем
+    target_row = all_rows[idx]
+    target_cluster_id = (target_row.get("cluster_id") or "").strip()
+    if not target_cluster_id:
+        target_cluster_id = hash_key(card_key(target_row))
+        target_row["cluster_id"] = target_cluster_id
+    return target_cluster_id
+
+
+def call_llm(client, model, item, weights, candidates):
     prompt = PROMPT_TEMPLATE.format(
         criteria_keys=", ".join(weights.keys()),
         source_name=item["source_name"],
         title=item["title"],
         snippet=item["snippet"],
+        candidates_block=_format_candidates(candidates),
     )
     resp = client.messages.create(
         model=model,
@@ -123,43 +203,61 @@ def analyze():
         return
 
     weights = cfg["priority_weights"]
-    file_exists = BACKLOG_PATH.exists() and BACKLOG_PATH.stat().st_size > 0
 
-    with BACKLOG_PATH.open("a", newline="", encoding="utf-8") as f:
+    # Читаем весь текущий бэклог в память (а не дописываем построчно, как
+    # раньше) — нужно, чтобы при обнаружении дубля можно было проставить
+    # cluster_id и уже существующей строке, если она ещё не была частью
+    # кластера (см. _resolve_cluster_id). Файл размером в сотни-тысячи
+    # строк это не проблема, а бэклог как раз такого масштаба.
+    all_rows = []
+    if BACKLOG_PATH.exists() and BACKLOG_PATH.stat().st_size > 0:
+        with BACKLOG_PATH.open(newline="", encoding="utf-8") as f:
+            all_rows = list(csv.DictReader(f))
+
+    duplicates_found = 0
+    for item in items:
+        candidates = _dedup_candidates(all_rows)
+        try:
+            result = call_llm(client, model, item, weights, candidates)
+        except Exception as e:
+            print(f"Пропуск '{item['title']}': ошибка LLM ({e})")
+            continue
+
+        criteria_scores = result.get("criteria_scores", {})
+        score = weighted_score(criteria_scores, weights)
+        cluster_id = _resolve_cluster_id(result.get("duplicate_of_index"), candidates, all_rows)
+        if cluster_id:
+            duplicates_found += 1
+
+        all_rows.append({
+            "date_found": date.today().isoformat(),
+            "source_url": item["url"],
+            "source_date": item["published"],
+            "source_tier": item.get("group", ""),  # поле называется source_tier по
+            # историческим причинам, хранит название группы источника
+            "in_target_window": item["in_target_window"],
+            "market_guess": item["market_guess"],
+            "title": item["title"],
+            "fact": result.get("fact", ""),
+            "interpretation": result.get("interpretation", ""),
+            "cluster_id": cluster_id,
+            "opportunity_hypothesis": result.get("opportunity_hypothesis", ""),
+            "criteria_scores": json.dumps(criteria_scores, ensure_ascii=False),
+            "priority_score": score,
+            "confidence": result.get("confidence", ""),
+            "key_unknowns": result.get("key_unknowns", ""),
+            "status": "new",
+        })
+        note = " — похоже, дубль уже известной истории" if cluster_id else ""
+        print(f"Добавлено: {item['title']} (score={score}){note}")
+
+    with BACKLOG_PATH.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        if not file_exists:
-            writer.writeheader()
+        writer.writeheader()
+        writer.writerows(all_rows)
 
-        for item in items:
-            try:
-                result = call_llm(client, model, item, weights)
-            except Exception as e:
-                print(f"Пропуск '{item['title']}': ошибка LLM ({e})")
-                continue
-
-            criteria_scores = result.get("criteria_scores", {})
-            score = weighted_score(criteria_scores, weights)
-
-            writer.writerow({
-                "date_found": date.today().isoformat(),
-                "source_url": item["url"],
-                "source_date": item["published"],
-                "source_tier": item.get("group", ""),  # поле называется source_tier по
-                # историческим причинам, хранит название группы источника
-                "in_target_window": item["in_target_window"],
-                "market_guess": item["market_guess"],
-                "title": item["title"],
-                "fact": result.get("fact", ""),
-                "interpretation": result.get("interpretation", ""),
-                "cluster_id": "",  # автокластеризация повторов — TODO, см. README
-                "opportunity_hypothesis": result.get("opportunity_hypothesis", ""),
-                "criteria_scores": json.dumps(criteria_scores, ensure_ascii=False),
-                "priority_score": score,
-                "confidence": result.get("confidence", ""),
-                "key_unknowns": result.get("key_unknowns", ""),
-                "status": "new",
-            })
-            print(f"Добавлено: {item['title']} (score={score})")
+    if duplicates_found:
+        print(f"Найдено и сгруппировано дублей: {duplicates_found}")
 
 
 if __name__ == "__main__":

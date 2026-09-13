@@ -47,6 +47,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 from build_dashboard import CONFIG_PATH, load_rows, traffic_light
+from signal_id import hash_key, card_key, is_primary
 
 TELEGRAM_MAX_CHARS = 3500  # запас от лимита Telegram в 4096 символов на сообщение
 COLOR_LABELS = {
@@ -56,42 +57,10 @@ COLOR_LABELS = {
 }
 COLOR_ORDER = ["green", "yellow", "red"]
 
-
-# ---- Тот же хэш id карточки, что и в build_dashboard.py (функция
-# hashKey в JS) — нужен, чтобы найти голоса сигнала в Firestore
-# (signal_votes/{fid}) и понять, не ушёл ли он уже на 2-й уровень.
-# Проверено на совпадение с JS построчно (см. историю сессии) — если
-# когда-нибудь измените hashKey в build_dashboard.py, поправьте и здесь.
-def _imul32(a, b):
-    return ((a & 0xFFFFFFFF) * (b & 0xFFFFFFFF)) & 0xFFFFFFFF
-
-
-def _utf16_code_units(s):
-    units = []
-    for ch in s:
-        cp = ord(ch)
-        if cp > 0xFFFF:
-            cp -= 0x10000
-            units.append(0xD800 + (cp >> 10))
-            units.append(0xDC00 + (cp & 0x3FF))
-        else:
-            units.append(cp)
-    return units
-
-
-def hash_key(s: str) -> str:
-    h1 = 0xdeadbeef
-    h2 = 0x41c6ce57
-    for ch in _utf16_code_units(s):
-        h1 = _imul32(h1 ^ ch, 2654435761)
-        h2 = _imul32(h2 ^ ch, 1597334677)
-    h1 = (_imul32(h1 ^ (h1 >> 16), 2246822507) ^ _imul32(h2 ^ (h2 >> 13), 3266489909)) & 0xFFFFFFFF
-    h2 = (_imul32(h2 ^ (h2 >> 16), 2246822507) ^ _imul32(h1 ^ (h1 >> 13), 3266489909)) & 0xFFFFFFFF
-    return format(h1, "08x") + format(h2, "08x")
-
-
-def card_key(row):
-    return (row.get("source_url", "").strip() or row.get("title", "")) + "|" + row.get("title", "")
+# hash_key/card_key/is_primary — теперь в signal_id.py, общие с
+# analyze_signals.py (простановка cluster_id) и build_dashboard.py
+# (схлопывание дублей на дашборде). JS-версия hashKey в build_dashboard.py
+# по-прежнему отдельная — см. пояснение в signal_id.py.
 
 
 # ---- Статус 2-го уровня — портированная копия computeLevel2Status из
@@ -139,6 +108,10 @@ def load_level1_signals(db, cfg):
 
     result = []
     for row in load_rows():
+        if not is_primary(row):
+            continue  # дубль этой же истории с другого источника — см.
+            # analyze_signals.py; в рассылку идёт только "главная" строка
+            # кластера, дашборд показывает остальные внутри её карточки
         fid = hash_key(card_key(row))
         vote_doc = db.collection("signal_votes").document(fid).get()
         counts = vote_doc.to_dict() if vote_doc.exists else {}

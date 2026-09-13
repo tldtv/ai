@@ -36,6 +36,8 @@ from pathlib import Path
 
 import yaml
 
+from signal_id import hash_key, card_key, is_primary
+
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "parameters.yaml"
 BACKLOG_PATH = ROOT / "data" / "backlog.csv"
@@ -206,11 +208,17 @@ TEMPLATE = """<!doctype html>
   .pill.grey{{background:var(--grey-soft);color:var(--grey-ink);}}
   .pill.market{{background:var(--accent-soft);color:var(--accent);}}
   .pill.status{{background:var(--grey-soft);color:var(--grey-ink);}}
+  .pill.dup-badge{{background:var(--accent-soft);color:var(--accent);}}
   .flag{{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}}
   .misc-list{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:#444;}}
   .misc-list li{{position:relative;padding:3px 0 3px 14px;line-height:1.5;}}
   .misc-list li::before{{content:"•";position:absolute;left:0;color:var(--accent);}}
   .misc-list a{{color:var(--accent);}}
+  .dup-list{{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:#444;}}
+  .dup-list li{{position:relative;padding:3px 0 3px 14px;line-height:1.5;}}
+  .dup-list li::before{{content:"•";position:absolute;left:0;color:var(--accent);}}
+  .dup-list a{{color:var(--accent);}}
+  .dup-meta{{color:#888;}}
   .empty{{color:#999;font-size:13px;grid-column:1/-1;}}
 
   .card-collapse{{margin-top:6px;}}
@@ -1628,6 +1636,38 @@ def render_misc_block(row, confidence, window_flag):
     )
 
 
+def _ru_plural(n, one, few, many):
+    n_mod10, n_mod100 = n % 10, n % 100
+    if n_mod10 == 1 and n_mod100 != 11:
+        return one
+    if 2 <= n_mod10 <= 4 and not 12 <= n_mod100 <= 14:
+        return few
+    return many
+
+
+def render_duplicates_block(dups):
+    """Список источников, которые (по мнению модели в analyze_signals.py)
+    писали про ту же самую историю, что и эта карточка — см. cluster_id
+    и is_primary в signal_id.py. Дубли не становятся отдельными карточками
+    на дашборде (и не попадают в рассылку, см. send_digest.py), а видны
+    здесь как раскрывающийся список внутри "главной" карточки."""
+    if not dups:
+        return ""
+    items = "".join(
+        f'<li><a href="{html.escape(d.get("source_url","") or "#")}" target="_blank" rel="noopener">'
+        f'{html.escape(d.get("title","") or d.get("source_url","") or "Источник")}</a>'
+        f' <span class="dup-meta">— {html.escape((d.get("source_tier") or "").strip() or "источник")}'
+        f'{html.escape(", " + d.get("source_date")) if (d.get("source_date") or "").strip() else ""}</span></li>'
+        for d in dups
+    )
+    n = len(dups)
+    label = _ru_plural(n, "источник", "источника", "источников")
+    return (
+        f'<details class="card-collapse dup-block"><summary>Также писали ещё {n} {label}</summary>'
+        f'<ul class="dup-list">{items}</ul></details>'
+    )
+
+
 def render_comments_block():
     return (
         '<details class="card-collapse comments"><summary>Комментарии</summary>'
@@ -1654,9 +1694,8 @@ def render_vote_row():
     )
 
 
-def render_card(row, color, idx, group_lookup, group_descriptions, market_descriptions):
+def render_card(row, color, idx, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary):
     market = row.get("market_guess", "") or "Не определено"
-    cluster = row.get("cluster_id", "")
     status = row.get("status", "") or "new"
     confidence = row.get("confidence", "") or "—"
     score = row.get("priority_score") or "—"
@@ -1667,6 +1706,8 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
     group = (row.get("source_tier") or "").strip()
     in_window = str(row.get("in_target_window", "")).strip().lower()
     window_flag = in_window in ("false", "0", "нет")
+
+    dups = duplicates_by_primary.get(hash_key(card_key(row)), [])
 
     market_tip = html.escape(market_descriptions.get(market, ""))
     badges = f'<span class="pill market" tabindex="0" data-tip="{market_tip}">{html.escape(market)}</span>'
@@ -1679,8 +1720,12 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
             tip_parts.append("Источники: " + ", ".join(group_sources))
         group_tip = html.escape(" ".join(tip_parts))
         badges += f'<span class="pill" tabindex="0" data-tip="{group_tip}">{html.escape(group)}</span>'
-    if cluster:
-        badges += f'<span class="pill">кластер {html.escape(cluster)}</span>'
+    if dups:
+        dup_label = _ru_plural(len(dups), "источник", "источника", "источников")
+        badges += (
+            f'<span class="pill dup-badge" tabindex="0" data-tip="Эту историю также писали другие '
+            f'источники — раскройте блок «Также писали» ниже">+{len(dups)} {html.escape(dup_label)}</span>'
+        )
 
     status_attrs = ""
     if status == "new":
@@ -1688,7 +1733,7 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
         if tip:
             status_attrs = f' tabindex="0" data-tip="{html.escape(tip)}"'
 
-    key = html.escape((row.get("source_url", "").strip() or row.get("title", "")) + "|" + row.get("title", ""))
+    key = html.escape(card_key(row))
     has_breakdown = bool((row.get("criteria_scores") or "").strip())
 
     return f"""
@@ -1701,6 +1746,7 @@ def render_card(row, color, idx, group_lookup, group_descriptions, market_descri
       <div class="badges">{badges}</div>
       {render_description_blocks(row)}
       {render_misc_block(row, confidence, window_flag)}
+      {render_duplicates_block(dups)}
       {render_breakdown(row) if has_breakdown else ""}
       {render_vote_row()}
       {render_comments_block()}
@@ -1765,6 +1811,21 @@ def market_description(name, markets_cfg):
     return DEFAULT_MARKET_DESCRIPTIONS.get(name, "")
 
 
+def group_duplicates(all_rows):
+    """Группирует строки-дубли (is_primary(row) == False) по fid "главной"
+    строки их кластера — см. схему в signal_id.py. Возвращает словарь
+    {fid_главной_строки: [дубли]}, который render_card использует, чтобы
+    найти дубли своей собственной карточки."""
+    groups = {}
+    for row in all_rows:
+        if is_primary(row):
+            continue
+        cluster_id = (row.get("cluster_id") or "").strip()
+        if cluster_id:
+            groups.setdefault(cluster_id, []).append(row)
+    return groups
+
+
 def build():
     cfg = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
     thresholds = cfg["traffic_light_thresholds"]
@@ -1776,7 +1837,15 @@ def build():
     votes_to_promote = int(cfg.get("votes_to_promote", 3) or 3)
     cadence_days = int(cfg.get("update_cadence_days", 7) or 7)
 
-    rows = load_rows()
+    all_rows = load_rows()
+    duplicates_by_primary = group_duplicates(all_rows)
+    # Дубли (см. signal_id.is_primary) не становятся отдельными карточками
+    # на дашборде — они видны внутри карточки "главной" строки своего
+    # кластера (render_duplicates_block). Всё дальше (счётчики, фильтры,
+    # вкладки рынков/групп, signals_json) считается только по "главным"
+    # строкам — иначе один и тот же сигнал с трёх источников засчитался бы
+    # в статистику трижды.
+    rows = [r for r in all_rows if is_primary(r)]
     colors = [traffic_light(r.get("priority_score"), thresholds) for r in rows]
 
     markets = sorted({r.get("market_guess", "Не определено") for r in rows})
@@ -1820,7 +1889,7 @@ def build():
     ) or "<p class=\"note\">Источники ещё не заданы в config/parameters.yaml -> sources</p>"
 
     cards_html = "".join(
-        render_card(r, c, i, group_lookup, group_descriptions, market_descriptions)
+        render_card(r, c, i, group_lookup, group_descriptions, market_descriptions, duplicates_by_primary)
         for i, (r, c) in enumerate(zip(rows, colors))
     ) or '<p class="empty">Пока нет сигналов</p>'
     signals_json = build_signals_json(rows, colors)
