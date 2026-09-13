@@ -184,7 +184,7 @@ TEMPLATE = """<!doctype html>
 
   .stats{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px;}}
   .stats[hidden]{{display:none;}}
-  .stat{{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;border-left:4px solid var(--grey);}}
+  .stat{{flex:1;min-width:110px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;color:var(--ink);border-left:4px solid var(--grey);}}
   .stat .n{{display:block;font-size:22px;font-weight:700;line-height:1.1;}}
   .stat .l{{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;}}
   .stat.total{{border-left-color:var(--accent);}}
@@ -306,7 +306,8 @@ TEMPLATE = """<!doctype html>
   .admin-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px dashed var(--border);}}
   .admin-row:first-of-type{{border-top:none;}}
   .admin-row label{{font-size:12.5px;}}
-  .admin-row input{{width:80px;font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);text-align:right;}}
+  .admin-row input{{width:80px;font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);text-align:right;}}
+  .admin-row select{{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--ink);}}
   .admin-section-title{{font-size:11.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:16px 0 2px;}}
 
   .check-list{{display:flex;flex-wrap:wrap;gap:8px 16px;padding:6px 0 10px;}}
