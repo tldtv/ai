@@ -188,6 +188,26 @@ def _resolve_funnel_stages(raw_value, funnel_stages_cfg):
     return "; ".join(dict.fromkeys(picked))  # dict.fromkeys — убрать дубли, сохранив порядок
 
 
+def _extract_text(resp):
+    """Достаёт итоговый текстовый блок из ответа модели.
+
+    Начиная с claude-sonnet-5 модель иногда сама, без явного запроса,
+    включает "размышление" (thinking) — тогда resp.content НЕ начинается
+    сразу с текста, а первым идёт ThinkingBlock (поле .thinking, а не
+    .text). Старый код брал resp.content[0].text вслепую — на моделях,
+    что вели себя так, ЛЮБОЙ вызов падал с AttributeError на 100% сигналов
+    (это и произошло в реальном прогоне: 40 из 40 "ошибка LLM"), при этом
+    сам сигнал был бы прекрасно проанализирован, если бы не эта ошибка
+    разбора ответа. Поэтому ищем именно блок типа "text", а не полагаемся
+    на позицию — это правильно и для сегодняшних моделей, и для будущих,
+    которые могут добавлять другие служебные блоки перед текстом."""
+    for block in resp.content:
+        if getattr(block, "type", None) == "text":
+            return block.text.strip()
+    block_types = [getattr(b, "type", type(b).__name__) for b in resp.content]
+    raise ValueError(f"В ответе модели нет текстового блока (получены блоки: {block_types})")
+
+
 def call_llm(client, model, item, weights, candidates, funnel_stages_cfg):
     prompt = PROMPT_TEMPLATE.format(
         criteria_keys=", ".join(weights.keys()),
@@ -205,9 +225,13 @@ def call_llm(client, model, item, weights, candidates, funnel_stages_cfg):
         # opportunity_hypothesis) свободной длины, поэтому не опускаем
         # сильно ниже — риск обрезать ответ и сломать JSON стоит дороже
         # сэкономленного
+        thinking={"type": "disabled"},  # см. _extract_text — этой задаче
+        # "размышление" не нужно (структурированная разметка по жёсткой
+        # схеме), а неявное включение только тратит бюджет max_tokens и
+        # ломало разбор ответа на claude-sonnet-5
         messages=[{"role": "user", "content": prompt}],
     )
-    text = resp.content[0].text.strip()
+    text = _extract_text(resp)
     if text.startswith("```"):
         text = text.strip("`")
         text = text.split("\n", 1)[1] if "\n" in text else text

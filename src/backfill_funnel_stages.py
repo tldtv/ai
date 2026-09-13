@@ -35,7 +35,7 @@ import yaml
 from anthropic import Anthropic
 
 from signal_id import is_primary
-from analyze_signals import _format_funnel_stages_block, _resolve_funnel_stages
+from analyze_signals import _format_funnel_stages_block, _resolve_funnel_stages, _extract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "parameters.yaml"
@@ -71,9 +71,12 @@ def classify(client, model, row, funnel_stages_cfg):
     resp = client.messages.create(
         model=model,
         max_tokens=150,
+        thinking={"type": "disabled"},  # см. analyze_signals._extract_text —
+        # без этого claude-sonnet-5 может сам включить "размышление", и
+        # тогда resp.content[0] окажется не текстовым блоком
         messages=[{"role": "user", "content": prompt}],
     )
-    text = resp.content[0].text.strip()
+    text = _extract_text(resp)
     if text.startswith("```"):
         text = text.strip("`")
         text = text.split("\n", 1)[1] if "\n" in text else text
@@ -114,11 +117,15 @@ def backfill():
     print(f"Строк для разметки: {len(todo)} из {len(rows)} (дубли и уже размеченные пропущены).")
 
     tagged = 0
+    failed = 0
+    last_error = None
     for row in todo:
         try:
             stages = classify(client, model, row, funnel_stages_cfg)
         except Exception as e:
-            print(f"  Пропуск '{row.get('title', '')}': ошибка LLM ({e})")
+            failed += 1
+            last_error = e
+            print(f"  Пропуск '{row.get('title', '')}': ошибка LLM ({type(e).__name__}: {e})")
             continue
         row["funnel_stages"] = stages
         if stages:
@@ -132,6 +139,16 @@ def backfill():
         writer.writerows(rows)
 
     print(f"Готово: размечено {tagged} из {len(todo)} строк.")
+
+    # См. analyze_signals.analyze() — та же защита: если ошиблись АБСОЛЮТНО
+    # все строки, это системная проблема (ключ/лимит/формат ответа), а не
+    # "не повезло с одной строкой" — роняем прогон явно, а не тихо пишем
+    # файл без единой новой разметки под видом успеха.
+    if failed and failed == len(todo):
+        raise SystemExit(
+            f"Все {failed} строк не прошли разметку — ни одна не размечена. "
+            f"Последняя ошибка ({type(last_error).__name__}): {last_error}"
+        )
 
 
 if __name__ == "__main__":
