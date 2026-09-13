@@ -1,0 +1,75 @@
+name: Historical Backfill
+
+# Ретроспективный сбор старых сигналов внутри окна дат (по умолчанию —
+# config/parameters.yaml -> target_window, сейчас июнь-август 2026 для
+# этого кейса). ТОЛЬКО ручной запуск — специально без schedule, чтобы не
+# оказаться рядом с обычным еженедельным сканом случайно: это разные по
+# смыслу операции (см. weekly_signal_scan.yml), и объединять их в один
+# workflow с режимом-параметром раньше было источником путаницы и
+# случайных дорогих запусков (см. README, "Стоимость API").
+#
+# Внимание: RSS-ленты обычно хранят только последние ~20-50 записей, а не
+# архив за несколько месяцев — этот workflow соберёт только то, что ещё
+# реально доступно в ленте на момент запуска и попадает в окно ниже. Для
+# полноценного сбора уже прошедшего периода часто практичнее один раз
+# внести найденное вручную прямо в data/backlog.csv (см. README).
+#
+# Рассылку подписчикам этот workflow НЕ запускает — не рассылать же
+# письмо о "новом" сигнале трёхмесячной давности: оповещать о свежем
+# продолжает только weekly_signal_scan.yml.
+#
+# concurrency — общая с weekly_signal_scan.yml: оба пишут в один и тот же
+# data/backlog.csv, параллельный запуск обоих означал бы либо конфликт
+# при коммите, либо двойную оплату анализа одних и тех же статей, если
+# они попадают в обе выборки.
+concurrency:
+  group: signal-pipeline
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Дата начала окна, формат ГГГГ-ММ-ДД (пусто = взять из config -> target_window)"
+        required: false
+        default: ""
+      end:
+        description: "Дата конца окна, формат ГГГГ-ММ-ДД (пусто = взять из config -> target_window)"
+        required: false
+        default: ""
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline (fetch + analyze), backfill mode
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python src/run_pipeline.py \
+            --mode backfill \
+            --start "${{ github.event.inputs.start || '' }}" \
+            --end "${{ github.event.inputs.end || '' }}"
+
+      - name: Build dashboard
+        run: python src/build_dashboard.py
+
+      - name: Commit updated backlog and dashboard
+        run: |
+          git config user.name "avito-signal-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/backlog.csv docs/index.html
+          git diff --cached --quiet || git commit -m "Ретроспективный сбор сигналов (backfill) [skip ci]"
+          git pull --rebase origin main
+          git push

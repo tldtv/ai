@@ -18,6 +18,43 @@
     --red: #c0392b;      --red-soft: #fbe1de;    --red-ink: #96291b;
     --grey: #8a8f96;     --grey-soft: #eceded;   --grey-ink: #5c6066;
   }
+  /* Тёмная тема — переключатель в панели настроек (⚙️ -> "Оформление"),
+     хранится в localStorage у каждого посетителя отдельно, ни с кем не
+     синхронизируется (в отличие от остальных настроек в той же панели).
+     По умолчанию — "как в системе": ниже сначала идёт вариант через
+     prefers-color-scheme (срабатывает, только если человек НЕ выбирал
+     тему явно — проверяется через :not([data-theme="light"]), т.к.
+     "тёмная" и так перекроется следующим блоком по себестоимости
+     специфичности), а затем — явный выбор через [data-theme="dark"],
+     который всегда побеждает независимо от системной темы. Почти весь
+     остальной CSS уже написан через переменные (var(--ink) и т.д.), а не
+     через прямые цвета, поэтому переопределить нужно только их. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --accent-soft: #7C3AED33;
+      --bg: #16181c;
+      --surface: #1f2226;
+      --ink: #ECE9E2;
+      --ink-soft: #9aa0a8;
+      --border: #33373d;
+      --green: #3fbf74;    --green-soft: #17301f; --green-ink: #7be3a4;
+      --yellow: #e0a83a;   --yellow-soft: #332711; --yellow-ink: #f0c874;
+      --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
+      --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
+    }
+  }
+  :root[data-theme="dark"] {
+    --accent-soft: #7C3AED33;
+    --bg: #16181c;
+    --surface: #1f2226;
+    --ink: #ECE9E2;
+    --ink-soft: #9aa0a8;
+    --border: #33373d;
+    --green: #3fbf74;    --green-soft: #17301f; --green-ink: #7be3a4;
+    --yellow: #e0a83a;   --yellow-soft: #332711; --yellow-ink: #f0c874;
+    --red: #e0574a;      --red-soft: #3a1c19;    --red-ink: #f29088;
+    --grey: #9aa0a8;     --grey-soft: #2a2d32;   --grey-ink: #c3c7cc;
+  }
   *{box-sizing:border-box;}
   body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:32px 24px 60px;}
   h1{font-size:22px;margin:0 0 4px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
@@ -25,7 +62,7 @@
 
   /* Баннер режима "один сигнал по ссылке из рассылки" (?card=<fid>) —
      см. checkCardFocusLink() в скрипте ниже. */
-  .card-focus-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#F1EBFB;border:1px solid #d9c8f5;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13.5px;color:var(--ink);}
+  .card-focus-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:13.5px;color:var(--ink);}
   .card-focus-banner[hidden]{display:none;}
   .card-focus-banner strong{color:var(--accent);}
   .card-focus-back{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#fff;background:var(--accent);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none;white-space:nowrap;}
@@ -102,8 +139,8 @@
   .score-range{gap:10px;}
   .range-slider{position:relative;height:26px;width:130px;}
   .range-slider input[type=range]{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);-webkit-appearance:none;appearance:none;width:100%;height:0;background:transparent;pointer-events:none;margin:0;}
-  .range-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 1px var(--accent);cursor:pointer;margin-top:0;}
-  .range-slider input[type=range]::-moz-range-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid #fff;box-shadow:0 0 0 1px var(--accent);cursor:pointer;}
+  .range-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent);cursor:pointer;margin-top:0;}
+  .range-slider input[type=range]::-moz-range-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 0 0 1px var(--accent);cursor:pointer;}
   .range-slider input[type=range]::-webkit-slider-runnable-track{background:transparent;}
   .range-slider input[type=range]::-moz-range-track{background:transparent;}
   .range-track{position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);background:var(--border);border-radius:2px;}
@@ -129,23 +166,23 @@
   .pill.status{background:var(--grey-soft);color:var(--grey-ink);}
   .pill.dup-badge{background:var(--accent-soft);color:var(--accent);}
   .flag{font-size:10.5px;color:var(--yellow-ink);background:var(--yellow-soft);padding:1px 6px;border-radius:999px;}
-  .misc-list{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:#444;}
+  .misc-list{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--ink);}
   .misc-list li{position:relative;padding:3px 0 3px 14px;line-height:1.5;}
   .misc-list li::before{content:"•";position:absolute;left:0;color:var(--accent);}
   .misc-list a{color:var(--accent);}
-  .dup-list{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:#444;}
+  .dup-list{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--ink);}
   .dup-list li{position:relative;padding:3px 0 3px 14px;line-height:1.5;}
   .dup-list li::before{content:"•";position:absolute;left:0;color:var(--accent);}
   .dup-list a{color:var(--accent);}
-  .dup-meta{color:#888;}
-  .empty{color:#999;font-size:13px;grid-column:1/-1;}
+  .dup-meta{color:var(--ink-soft);}
+  .empty{color:var(--ink-soft);font-size:13px;grid-column:1/-1;}
 
   .card-collapse{margin-top:6px;}
   .card-collapse summary{font-size:12px;color:var(--accent);cursor:pointer;list-style:none;}
   .card-collapse summary::-webkit-details-marker{display:none;}
   .card-collapse summary::before{content:"▸ ";}
   .card-collapse[open] summary::before{content:"▾ ";}
-  .card-collapse .body{margin:8px 0 0;font-size:12.5px;color:#444;line-height:1.5;}
+  .card-collapse .body{margin:8px 0 0;font-size:12.5px;color:var(--ink);line-height:1.5;}
 
   .breakdown ul{list-style:none;margin:8px 0 0;padding:0;font-size:12px;}
   .breakdown li{display:flex;justify-content:space-between;align-items:center;padding:4px 2px;border-top:1px dashed var(--border);}
@@ -196,7 +233,7 @@
   .tg-connect-btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:999px;background:#229ED9;color:#fff;text-decoration:none;margin:4px 0 8px;}
   .tg-connect-btn:hover{background:#1c86ba;}
   .sub-status{font-size:11.5px;color:var(--ink-soft);margin:0 0 10px;}
-  .sub-status.confirmed{color:#1a9e5c;font-weight:600;}
+  .sub-status.confirmed{color:var(--green);font-weight:600;}
   .admin-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:18px;}
   .admin-actions button{font:inherit;font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);cursor:pointer;}
   .admin-actions .save{border-color:var(--accent);background:var(--accent);color:#fff;}
@@ -220,6 +257,20 @@
   .assistant-form input{flex:1;font:inherit;font-size:13px;padding:9px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--ink);}
   .assistant-form button{font:inherit;font-size:13px;font-weight:600;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;}
 </style>
+<script>
+  // Применяем сохранённую тему СРАЗУ, до отрисовки body — иначе страница
+  // на долю секунды мигнёт светлой темой перед переключением на тёмную
+  // (в localStorage у КАЖДОГО посетителя своё значение, ни с чем не
+  // синхронизируется — см. панель настроек, раздел "Оформление").
+  (function() {
+    try {
+      var saved = localStorage.getItem('dashboardTheme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    } catch (e) { /* localStorage недоступен (приватный режим и т.п.) — остаёмся на "как в системе" */ }
+  })();
+</script>
 </head>
 <body>
   <h1>Точки роста — Авито.Работа
@@ -1802,7 +1853,14 @@
   <div class="admin-overlay" id="adminOverlay" hidden>
     <div class="admin-modal">
       <h2>Настройки дашборда</h2>
-      <p class="note">Открыто всем, у кого есть ссылка на дашборд — как и голосование. Изменения применяются сразу у всех, без нового запуска пайплайна, и хранятся в Firestore поверх значений по умолчанию из config/parameters.yaml.</p>
+      <div class="admin-section-title">Оформление</div>
+      <div class="tabs" id="themeTabs">
+        <button class="tab" data-theme-choice="light" type="button">☀️ Светлая</button>
+        <button class="tab" data-theme-choice="dark" type="button">🌙 Тёмная</button>
+        <button class="tab active" data-theme-choice="system" type="button">🖥 Как в системе</button>
+      </div>
+      <p class="note">Только у вас, в этом браузере на этом устройстве — на то, что видят остальные, не влияет, и сохраняется отдельно от всего ниже (не в Firestore).</p>
+      <p class="note">Всё ниже открыто всем, у кого есть ссылка на дашборд — как и голосование. Изменения применяются сразу у всех, без нового запуска пайплайна, и хранятся в Firestore поверх значений по умолчанию из config/parameters.yaml.</p>
       <div class="admin-section-title">Пороги светофора (шкала 1–5)</div>
       <div class="admin-row"><label>«Топ идея» (зелёный), от</label><input type="number" id="cfgGreenMin" step="0.1" min="0" max="5"></div>
       <div class="admin-row"><label>«Внимательно изучить» (жёлтый), от</label><input type="number" id="cfgYellowMin" step="0.1" min="0" max="5"></div>
@@ -2527,6 +2585,44 @@
     });
   });
 
+  // ---- Тема дашборда (светлая/тёмная/как в системе) — хранится в
+  // localStorage у каждого посетителя отдельно, в Firestore НЕ пишется
+  // (в отличие от остального в панели настроек ниже) — переключение
+  // применяется сразу, без кнопки "Сохранить". Начальное применение при
+  // самой первой загрузке страницы — см. <script> сразу после </style>,
+  // до отрисовки body (чтобы не было мигания светлой темой перед тёмной).
+  const THEME_KEY = 'dashboardTheme';
+  const themeTabs = document.getElementById('themeTabs');
+
+  function applyTheme(choice) {
+    if (choice === 'light' || choice === 'dark') {
+      document.documentElement.setAttribute('data-theme', choice);
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }
+
+  function syncThemeTabs() {
+    let saved = 'system';
+    try { saved = localStorage.getItem(THEME_KEY) || 'system'; } catch (e) { /* приватный режим браузера и т.п. */ }
+    themeTabs.querySelectorAll('.tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.themeChoice === saved);
+    });
+  }
+
+  themeTabs.addEventListener('click', e => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    const choice = btn.dataset.themeChoice;
+    applyTheme(choice);
+    try {
+      if (choice === 'system') { localStorage.removeItem(THEME_KEY); } else { localStorage.setItem(THEME_KEY, choice); }
+    } catch (e) { /* приватный режим и т.п. — тема применится сейчас, но не запомнится после перезагрузки */ }
+    syncThemeTabs();
+  });
+
+  syncThemeTabs();
+
   // ---- Админ-панель ----
   const adminBtn = document.getElementById('adminBtn');
   const adminOverlay = document.getElementById('adminOverlay');
@@ -2536,6 +2632,7 @@
   const cfgWeightsWrap = document.getElementById('cfgWeights');
 
   function fillAdminForm() {
+    syncThemeTabs();
     document.getElementById('cfgGreenMin').value = liveThresholds.green_min;
     document.getElementById('cfgYellowMin').value = liveThresholds.yellow_min;
     document.getElementById('cfgVotesToPromote').value = liveVotesToPromote;

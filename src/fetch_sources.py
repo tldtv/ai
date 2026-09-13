@@ -2,9 +2,26 @@
 fetch_sources.py — механический слой пайплайна.
 
 Тянет RSS-источники, перечисленные в config/parameters.yaml, фильтрует по
-целевому окну дат, размечает рынок по ключевым словам и отбрасывает уже
-известные ссылки (сверяясь с data/backlog.csv). К LLM не обращается —
-всё, что здесь происходит, детерминировано и воспроизводимо.
+дате, размечает рынок по ключевым словам и отбрасывает уже известные
+ссылки (сверяясь с data/backlog.csv). К LLM не обращается — всё, что
+здесь происходит, детерминировано и воспроизводимо, но именно этот файл
+решает, СКОЛЬКО статей вообще дойдёт до платного анализа — см. фильтр по
+дате ниже, это единственная стоимостная защита пайплайна.
+
+Два режима, теперь строго разделённых по смыслу (и по отдельным workflow
+— см. .github/workflows/weekly_signal_scan.yml и historical_backfill.yml):
+  - "weekly" — обычный режим. Статья должна быть опубликована не раньше
+    чем config -> weekly_recency_days дней назад, иначе отбрасывается ДО
+    анализа, даже если по ссылке она ещё не встречалась в бэклоге. Это
+    добавлено уже после первого инцидента с расходом (см. README,
+    "Стоимость API") — раньше в этом режиме в анализ уходило вообще всё,
+    что RSS-лента отдаёт на момент запуска, а это может быть много статей
+    разом (например, при самом первом запуске, когда сверять ещё не с
+    чем, или если запустить workflow вручную несколько раз подряд).
+  - "backfill" — ретроспективный сбор строго внутри config -> target_window
+    (используется только historical_backfill.yml, по расписанию не
+    запускается). Статьи вне окна отбрасываются ДО анализа так же, как
+    свежие статьи вне окна в режиме weekly.
 
 Результат — data/_new_raw_signals.json: список новых, ещё не обработанных
 сигналов, которые дальше передаются в analyze_signals.py.
@@ -65,8 +82,11 @@ def fetch(mode="weekly", start=None, end=None):
     # По умолчанию включено — см. комментарий у места использования ниже
     # и config/parameters.yaml -> require_market_match.
     require_market_match = cfg.get("require_market_match", True)
+    weekly_recency_days = int(cfg.get("weekly_recency_days", 10) or 10)
+    today = date.today()
 
     new_items = []
+    skipped_by_date = 0
     for src in cfg["sources"]:
         if src.get("type") != "rss" or not src.get("url"):
             continue  # источник без подтверждённого RSS — впишите url в config
@@ -81,6 +101,24 @@ def fetch(mode="weekly", start=None, end=None):
                 pub_dt = dateparser.parse(pub_raw) if pub_raw else None
             except Exception:
                 pub_dt = None
+
+            # Стоимостная защита (см. docstring выше и config ->
+            # weekly_recency_days) — статья отбрасывается ДО обращения к
+            # LLM, если не укладывается в разрешённое для этого режима
+            # окно дат. known_urls.add() ниже до этой проверки не дошли
+            # специально: если статью отбросили только по дате, а не
+            # потому что видели раньше, в следующий запуск (когда она,
+            # возможно, попадёт в окно, или после смены режима) её нужно
+            # рассмотреть заново.
+            if mode == "weekly":
+                pub_date = pub_dt.date() if isinstance(pub_dt, datetime) else pub_dt
+                if not pub_date or (today - pub_date).days > weekly_recency_days:
+                    skipped_by_date += 1
+                    continue
+            elif mode == "backfill":
+                if not in_window(pub_dt, start, end):
+                    skipped_by_date += 1
+                    continue
 
             title = entry.get("title", "")
             summary = entry.get("summary", "")
@@ -112,6 +150,8 @@ def fetch(mode="weekly", start=None, end=None):
 
     OUT_PATH.write_text(json.dumps(new_items, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Найдено новых сигналов: {len(new_items)} -> {OUT_PATH}")
+    if skipped_by_date:
+        print(f"Отброшено по дате (стоимостная защита, режим {mode}): {skipped_by_date}")
     return new_items
 
 
