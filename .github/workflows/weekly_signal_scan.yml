@@ -1,0 +1,69 @@
+name: Weekly Signal Scan
+
+# Обычный, регулярный запуск — только свежие сигналы (не старше
+# config/parameters.yaml -> weekly_recency_days от даты публикации,
+# сейчас 10 дней). Для ретроспективного сбора старых сигналов (например,
+# окна июнь-август 2026 для этого кейса) — отдельный workflow
+# historical_backfill.yml, у него другая, более широкая стоимостная
+# логика и он не запускается по расписанию (только вручную, осознанно).
+#
+# concurrency ниже — защита от повторных ручных нажатий «Run workflow»:
+# если предыдущий запуск (этот или historical_backfill.yml, group общая)
+# ещё не закоммитил обновлённый backlog.csv, следующий запуск ДОЖДЁТСЯ
+# его завершения, а не стартует параллельно с тем же самым устаревшим
+# backlog.csv на входе — иначе оба запуска не увидят новых URL друг друга
+# и заплатят за анализ одних и тех же статей дважды. Это и была причина
+# одного из прошлых больших расходов за API.
+concurrency:
+  group: signal-pipeline
+  cancel-in-progress: false
+
+on:
+  schedule:
+    # Каждый понедельник в 06:00 UTC (09:00 МСК)
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline (fetch + analyze)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python src/run_pipeline.py --mode weekly
+
+      - name: Build dashboard
+        run: python src/build_dashboard.py
+
+      - name: Send weekly digest
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python src/send_digest.py
+
+      - name: Commit updated backlog and dashboard
+        run: |
+          git config user.name "avito-signal-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/backlog.csv docs/index.html
+          git diff --cached --quiet || git commit -m "Еженедельное обновление бэклога сигналов [skip ci]"
+          # Пока пайплайн работал, на GitHub мог появиться новый коммит
+          # (например, кто-то запушил правки вручную) — тогда обычный push
+          # отклоняется ("fetch first"). git pull --rebase подтягивает этот
+          # новый коммит и переносит наш поверх него, чтобы push прошёл без
+          # ручного вмешательства.
+          git pull --rebase origin main
+          git push
