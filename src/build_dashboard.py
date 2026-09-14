@@ -644,6 +644,52 @@ TEMPLATE = """<!doctype html>
     }}
   }}
 
+  // Аналитика открытий дашборда — сколько уникальных людей заходит,
+  // сколько раз и насколько надолго задерживаются. НИКАК не отображается
+  // в интерфейсе (ни одного элемента на странице этому не посвящено) и
+  // НЕ читается с клиента ни при каких условиях — Firestore Security
+  // Rules запрещают чтение analytics_sessions даже тому же браузеру,
+  // который её создал (см. firestore_rules.txt). Увидеть цифры можно
+  // только через src/analytics_report.py — отдельный скрипт с доступом
+  // Admin SDK в обход правил, присылающий сводку вам на почту (см.
+  // README). Обёрнуто в try/catch и молчит при любой ошибке: сбой
+  // аналитики не должен быть заметен посетителю и не должен ничего
+  // ломать в остальном дашборде.
+  if (FIREBASE_ENABLED && db) {{
+    authReady.then(() => {{
+      if (!currentUid) return;  // анонимный вход отключён в Firebase — без
+      // стабильного uid "уникальный пользователь" считать не из чего,
+      // молча пропускаем, как и остальные Firebase-зависимые функции
+      try {{
+        const sessionId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+        const sessionRef = db.collection('analytics_sessions').doc(sessionId);
+        const startedAt = new Date().toISOString();
+        const startTime = Date.now();
+        sessionRef.set({{
+          uid: currentUid, started_at: startedAt, last_seen_at: startedAt, duration_seconds: 0,
+        }}).catch(() => {{}});
+
+        // "Пульс" каждые 30с, пока вкладка открыта — так длительность
+        // сессии известна с точностью до получения последнего пульса,
+        // даже если разрыв соединения/закрытие вкладки помешает
+        // финальной записи (see pagehide/visibilitychange ниже — они
+        // ПЫТАЮТСЯ дописать точный момент ухода, но не гарантированы).
+        const heartbeat = () => {{
+          const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+          sessionRef.update({{ last_seen_at: new Date().toISOString(), duration_seconds: durationSeconds }}).catch(() => {{}});
+        }};
+        const heartbeatTimer = setInterval(heartbeat, 30000);
+        document.addEventListener('visibilitychange', () => {{
+          if (document.visibilityState === 'hidden') heartbeat();
+        }});
+        window.addEventListener('pagehide', () => {{
+          clearInterval(heartbeatTimer);
+          heartbeat();
+        }});
+      }} catch (e) {{ /* аналитика никогда не должна мешать основному дашборду */ }}
+    }});
+  }}
+
   // Стабильный короткий id карточки для Firestore (id документа не может
   // содержать "/", а в data-key есть ссылка на источник) — простой
   // детерминированный хэш, не криптографический, но коллизии между

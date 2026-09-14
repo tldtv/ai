@@ -66,16 +66,57 @@ service cloud.firestore {
     match /digest_subscriptions/{subId} {
       allow read: if false;
       allow create: if request.resource.data.keys().hasOnly(
-          ['channel', 'email', 'markets', 'groups', 'colors', 'recency_days', 'created_at']
+          ['channel', 'email', 'markets', 'groups', 'colors', 'recency_days', 'created_at',
+           'preferred_weekday', 'preferred_hour']
         )
         && request.resource.data.channel in ['email', 'telegram']
         && request.resource.data.markets is list
         && request.resource.data.groups is list
         && request.resource.data.colors is list
         && request.resource.data.recency_days is int
+        // preferred_weekday/preferred_hour необязательны (форма "Когда
+        // присылать" -> "Как только появится новое" их вообще не отправляет) —
+        // .get(key, 0) подставляет 0, если поля нет, поэтому проверка типа
+        // проходит и для этого случая, и для реально переданного числа.
+        && request.resource.data.get('preferred_weekday', 0) is int
+        && request.resource.data.get('preferred_hour', 0) is int
         && (request.resource.data.channel != 'email' || request.resource.data.email is string);
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unsubscribed'])
         && request.resource.data.unsubscribed == true;
+    }
+
+    // Аналитика открытий дашборда (src/build_dashboard.py — фоновая
+    // инструментация без какого-либо UI, ничего не отображает на самой
+    // странице) — сколько уникальных браузеров (anonymous auth uid)
+    // заходило, сколько раз и насколько надолго.
+    //
+    // read: запрещено ВСЕМ, включая того же посетителя, который создал
+    // свою же сессию — иначе цифры можно было бы прочитать через devtools
+    // прямо на странице дашборда, а весь смысл в том, чтобы это не было
+    // видно снаружи. Смотреть можно только через src/analytics_report.py
+    // (отдельный скрипт с доступом Admin SDK в обход правил).
+    // create: только свой анонимный uid, только ожидаемый набор полей,
+    // duration_seconds в разумных пределах (защита от случайно/специально
+    // отправленных абсурдных значений, портящих среднее).
+    // update: разрешено продлевать ТОЛЬКО свою же сессию (тот же uid) и
+    // ТОЛЬКО поля last_seen_at/duration_seconds — так дашборд периодически
+    // "пульсом" уточняет длительность, пока вкладка открыта.
+    // delete: запрещено.
+    match /analytics_sessions/{sessionId} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid', 'started_at', 'last_seen_at', 'duration_seconds'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.duration_seconds is number
+        && request.resource.data.duration_seconds >= 0
+        && request.resource.data.duration_seconds <= 86400;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['last_seen_at', 'duration_seconds'])
+        && request.resource.data.duration_seconds is number
+        && request.resource.data.duration_seconds >= 0
+        && request.resource.data.duration_seconds <= 86400;
+      allow delete: if false;
     }
   }
 }
