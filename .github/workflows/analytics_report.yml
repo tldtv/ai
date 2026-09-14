@@ -1,0 +1,45 @@
+name: Analytics Report
+
+# Присылает вам на почту (dashboard -> owner_email в
+# config/parameters.yaml) сводку посещаемости дашборда: сколько
+# уникальных людей его открывало, сколько раз и насколько надолго
+# задерживались. Этих цифр НЕТ на самом дашборде — src/build_dashboard.py
+# только тихо записывает их в Firestore в фоне (см. src/analytics_report.py
+# и firestore_rules.txt), а эта рассылка — единственный способ их
+# увидеть.
+#
+# По умолчанию — раз в неделю (по понедельникам, через час после
+# Weekly Signal Scan, чтобы не пересекаться с ним по нагрузке — хотя они
+# и работают с разными данными и никак друг другу не мешают) плюс кнопка
+# "Run workflow" для разового запуска в любой момент. Если письма раз в
+# неделю не нужны — удалите блок schedule ниже, оставив только
+# workflow_dispatch (будет работать так же, как backfill_funnel_stages.yml
+# — только по кнопке).
+concurrency:
+  group: analytics-report
+  cancel-in-progress: false
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build and send analytics report
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python src/analytics_report.py
